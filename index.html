@@ -516,7 +516,6 @@
             });
         });
         document.getElementById('gantt-table').innerHTML = html + `</tbody></table>`;
-        updateSelectors();
     };
 
     // Désélectionner quand on clique en dehors
@@ -686,15 +685,9 @@
 
     // GESTION TACHES
     window.editTask = function(id) {
-        const t = state.tasks.find(x => x.id === id);
-        document.getElementById('edit_task_id').value = t.id;
-        document.getElementById('t_proj_sel').value = t.pId;
-        document.getElementById('t_name').value = t.name;
-        document.getElementById('t_start').value = t.start;
-        document.getElementById('t_dur').value = t.duration || 1;
-        const sel = document.getElementById('t_staff_sel');
-        Array.from(sel.options).forEach(opt => opt.selected = t.staff.includes(opt.value));
-        document.getElementById('btn_del_task').style.display = "block";
+        // Juste définir l'ID de la tâche à éditer
+        document.getElementById('edit_task_id').value = id;
+        // showModal() s'occupera de charger toutes les données
         showModal('modalT');
     };
 
@@ -736,25 +729,11 @@
         } 
     };
 
-    function updateSelectors(preserveStaffSelection = false) {
-        // Sauvegarder les sélections actuelles du personnel si demandé
-        const staffSel = document.getElementById('t_staff_sel');
-        const currentSelections = preserveStaffSelection ? Array.from(staffSel.selectedOptions || []).map(o => o.value) : [];
-        
-        // Mettre à jour les options
+    function updateSelectors() {
         document.getElementById('t_proj_sel').innerHTML = (state.projects || []).map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
         document.getElementById('t_staff_sel').innerHTML = (state.staff || []).map(s => `<option value="${s}">${s}</option>`).join('');
         document.getElementById('staff-list').innerHTML = (state.staff || []).map(s => `<div>• ${s}</div>`).join('');
         document.getElementById('print_proj_sel').innerHTML = (state.projects || []).map(p => `<option value="${p.id}">${p.aff} – ${p.cli}</option>`).join('');
-        
-        // Restaurer les sélections du personnel si demandé
-        if (preserveStaffSelection) {
-            Array.from(staffSel.options).forEach(opt => {
-                if (currentSelections.includes(opt.value)) {
-                    opt.selected = true;
-                }
-            });
-        }
         
         const today = new Date();
         document.getElementById('print_start_date').value = formatDateKey(today);
@@ -763,29 +742,46 @@
     window.showModal = function(id) { 
         document.getElementById(id).style.display = 'flex'; 
         
+        // Toujours mettre à jour les selects quand on ouvre un modal
+        updateSelectors();
+        
         if (id === 'modalT') {
-            const isEditing = document.getElementById('edit_task_id').value;
-            if (!isEditing) {
+            const editTaskId = document.getElementById('edit_task_id').value;
+            
+            if (!editTaskId) {
                 // Nouvelle tâche : réinitialiser le formulaire
                 document.getElementById('t_name').value = '';
                 document.getElementById('t_start').value = '';
                 document.getElementById('t_dur').value = 1;
                 document.getElementById('btn_del_task').style.display = 'none';
                 
-                // Mettre à jour les selects sans préserver les sélections
-                updateSelectors(false);
-                
                 // Sélectionner le dernier projet créé par défaut
                 if (state.projects.length > 0) {
                     const lastProject = state.projects[state.projects.length - 1];
                     document.getElementById('t_proj_sel').value = lastProject.id;
                 }
+                
+                // Désélectionner tout le personnel
+                const sel = document.getElementById('t_staff_sel');
+                Array.from(sel.options).forEach(opt => opt.selected = false);
             } else {
-                // Édition : préserver les sélections de personnel
-                updateSelectors(true);
+                // Édition : recharger les données de la tâche après la reconstruction des selects
+                const task = state.tasks.find(t => t.id === parseInt(editTaskId));
+                if (task) {
+                    document.getElementById('t_proj_sel').value = task.pId;
+                    document.getElementById('t_name').value = task.name;
+                    document.getElementById('t_start').value = task.start;
+                    document.getElementById('t_dur').value = task.duration || 1;
+                    
+                    // Re-sélectionner le personnel
+                    const sel = document.getElementById('t_staff_sel');
+                    Array.from(sel.options).forEach(opt => {
+                        opt.selected = task.staff.includes(opt.value);
+                    });
+                    
+                    document.getElementById('btn_del_task').style.display = "block";
+                }
             }
-        } else {
-            updateSelectors(false);
         }
     };
     window.hideModal = function(id) {
