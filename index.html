@@ -736,10 +736,10 @@
         } 
     };
 
-    function updateSelectors() {
-        // Sauvegarder les sélections actuelles du personnel
+    function updateSelectors(preserveStaffSelection = false) {
+        // Sauvegarder les sélections actuelles du personnel si demandé
         const staffSel = document.getElementById('t_staff_sel');
-        const currentSelections = Array.from(staffSel.selectedOptions || []).map(o => o.value);
+        const currentSelections = preserveStaffSelection ? Array.from(staffSel.selectedOptions || []).map(o => o.value) : [];
         
         // Mettre à jour les options
         document.getElementById('t_proj_sel').innerHTML = (state.projects || []).map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
@@ -747,12 +747,14 @@
         document.getElementById('staff-list').innerHTML = (state.staff || []).map(s => `<div>• ${s}</div>`).join('');
         document.getElementById('print_proj_sel').innerHTML = (state.projects || []).map(p => `<option value="${p.id}">${p.aff} – ${p.cli}</option>`).join('');
         
-        // Restaurer les sélections du personnel
-        Array.from(staffSel.options).forEach(opt => {
-            if (currentSelections.includes(opt.value)) {
-                opt.selected = true;
-            }
-        });
+        // Restaurer les sélections du personnel si demandé
+        if (preserveStaffSelection) {
+            Array.from(staffSel.options).forEach(opt => {
+                if (currentSelections.includes(opt.value)) {
+                    opt.selected = true;
+                }
+            });
+        }
         
         const today = new Date();
         document.getElementById('print_start_date').value = formatDateKey(today);
@@ -760,9 +762,30 @@
 
     window.showModal = function(id) { 
         document.getElementById(id).style.display = 'flex'; 
-        if (id !== 'modalT' || !document.getElementById('edit_task_id').value) {
-            // Ne mettre à jour les selects que si ce n'est pas une édition de tâche en cours
-            updateSelectors(); 
+        
+        if (id === 'modalT') {
+            const isEditing = document.getElementById('edit_task_id').value;
+            if (!isEditing) {
+                // Nouvelle tâche : réinitialiser le formulaire
+                document.getElementById('t_name').value = '';
+                document.getElementById('t_start').value = '';
+                document.getElementById('t_dur').value = 1;
+                document.getElementById('btn_del_task').style.display = 'none';
+                
+                // Mettre à jour les selects sans préserver les sélections
+                updateSelectors(false);
+                
+                // Sélectionner le dernier projet créé par défaut
+                if (state.projects.length > 0) {
+                    const lastProject = state.projects[state.projects.length - 1];
+                    document.getElementById('t_proj_sel').value = lastProject.id;
+                }
+            } else {
+                // Édition : préserver les sélections de personnel
+                updateSelectors(true);
+            }
+        } else {
+            updateSelectors(false);
         }
     };
     window.hideModal = function(id) {
