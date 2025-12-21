@@ -538,35 +538,57 @@
         }
 
         const project = state.projects.find(p => p.id === projId);
-        if (!project) return;
+        if (!project) {
+            alert("Projet introuvable !");
+            return;
+        }
 
         const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 27);
+        endDate.setDate(endDate.getDate() + 27); // 4 semaines
 
-        const html = generatePrintTable(project, startDate, endDate, showStaff);
+        // Générer le HTML d'impression pour CE SEUL PROJET
+        const printHtml = generatePrintTable(project, startDate, endDate, showStaff);
         
+        // Sauvegarder le contenu original
         const ganttTable = document.getElementById('gantt-table');
         const originalContent = ganttTable.innerHTML;
-        ganttTable.innerHTML = html;
-
+        
+        // Mettre à jour l'en-tête d'impression
         const printHeader = document.getElementById('print-header');
+        const originalHeader = printHeader.innerHTML;
         printHeader.innerHTML = `${project.aff} – ${project.cli} | ${project.lie}<br><small style="font-size:14px;">Du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')}</small>`;
 
+        // Masquer/afficher les noms du personnel selon le choix
         if (!showStaff) {
             document.body.classList.add('print-hide-staff');
         }
 
+        // Fermer le modal AVANT de changer le contenu
         hideModal('modalPrint');
 
+        // Attendre que le modal soit fermé, PUIS remplacer le contenu
         setTimeout(() => {
-            window.print();
-            ganttTable.innerHTML = originalContent;
-            printHeader.innerHTML = '';
-            document.body.classList.remove('print-hide-staff');
+            // Remplacer par le contenu d'impression (UNIQUEMENT LE PROJET SÉLECTIONNÉ)
+            ganttTable.innerHTML = printHtml;
+            
+            // Lancer l'impression immédiatement
+            setTimeout(() => {
+                window.print();
+                
+                // Restaurer le contenu original après l'impression
+                ganttTable.innerHTML = originalContent;
+                printHeader.innerHTML = originalHeader;
+                document.body.classList.remove('print-hide-staff');
+            }, 200);
         }, 100);
     };
 
     function generatePrintTable(project, startDate, endDate, showStaff) {
+        if (!project) {
+            console.error('Aucun projet sélectionné pour l\'impression');
+            return '<p>Erreur : Aucun projet sélectionné</p>';
+        }
+
         const days = [];
         let current = new Date(startDate);
         while (current <= endDate) {
@@ -596,6 +618,7 @@
 
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
 
+        // AFFICHER UNIQUEMENT LE PROJET SÉLECTIONNÉ
         html += `<tr class="row-p">
             <td class="col-fixed">
                 <b>${project.aff} – ${project.cli}</b> | 📍 ${project.lie}
@@ -603,22 +626,29 @@
             </td>
             <td colspan="${days.length}"></td></tr>`;
 
-        state.tasks.filter(t => t.pId === project.id).forEach(t => {
-            html += `<tr><td class="col-fixed" style="padding-left:30px;">${t.name}</td>`;
-            let sD = new Date(t.start), eD = new Date(t.end);
-            
-            days.forEach((cur, idx) => {
-                let ds = formatDateKey(cur), content = "";
-                if (cur.toDateString() === sD.toDateString()) {
-                    let diff = Math.ceil((eD - sD) / (1000 * 60 * 60 * 24)) + 1;
-                    let width = Math.min(diff, days.length - idx) * 40;
-                    let staffHTML = showStaff ? (t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('') : '';
-                    content = `<div class="task-bar" style="background:${project.color}; width:${width-4}px;">${staffHTML}</div>`;
-                }
-                html += `<td class="col-day task-bar-cell ${cur.getDay()===0||cur.getDay()===6?'weekend':''} ${feries[ds]?'ferie':''} ${cur.getDay()===1?'sep-lundi':''}">${content}</td>`;
+        // AFFICHER UNIQUEMENT LES TÂCHES DU PROJET SÉLECTIONNÉ
+        const projectTasks = state.tasks.filter(t => t.pId === project.id);
+        
+        if (projectTasks.length === 0) {
+            html += `<tr><td class="col-fixed" style="padding-left:30px; font-style:italic; color:#999;">Aucune tâche pour ce projet</td><td colspan="${days.length}"></td></tr>`;
+        } else {
+            projectTasks.forEach(t => {
+                html += `<tr><td class="col-fixed" style="padding-left:30px;">${t.name}</td>`;
+                let sD = new Date(t.start), eD = new Date(t.end);
+                
+                days.forEach((cur, idx) => {
+                    let ds = formatDateKey(cur), content = "";
+                    if (cur.toDateString() === sD.toDateString()) {
+                        let diff = Math.ceil((eD - sD) / (1000 * 60 * 60 * 24)) + 1;
+                        let width = Math.min(diff, days.length - idx) * 40;
+                        let staffHTML = showStaff ? (t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('') : '';
+                        content = `<div class="task-bar" style="background:${project.color}; width:${width-4}px;">${staffHTML}</div>`;
+                    }
+                    html += `<td class="col-day task-bar-cell ${cur.getDay()===0||cur.getDay()===6?'weekend':''} ${feries[ds]?'ferie':''} ${cur.getDay()===1?'sep-lundi':''}">${content}</td>`;
+                });
+                html += `</tr>`;
             });
-            html += `</tr>`;
-        });
+        }
 
         return html + `</tbody></table>`;
     }
