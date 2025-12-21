@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>ASTEC GPAO - Cloud Collaborative</title>
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60; --weekend: #e8f5e9; --ferie: #fce4ec; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 20px; background: #f4f7f6; }
+        .header { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 15px; }
+        button { padding: 10px 15px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: 600; }
+        .btn-blue { background: var(--accent); }
+        .btn-green { background: var(--success); }
+        .btn-red { background: var(--danger); }
+        .btn-grey { background: #7f8c8d; }
+        #date-display { font-weight: bold; font-size: 1.2em; min-width: 220px; text-align: center; color: var(--primary); }
+        .gantt-container { background: white; padding: 15px; border-radius: 8px; overflow-x: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); min-height: 400px; }
+        table { border-collapse: collapse; width: max-content; min-width: 100%; position: relative; }
+        th, td { border: 1px solid #ddd; padding: 0; text-align: center; min-height: 45px; }
+        .col-day { width: 50px; min-width: 50px; height: 50px; position: relative; }
+        .sep-lundi { border-left: 3px solid #bdc3c7 !important; }
+        .weekend { background: var(--weekend) !important; }
+        .ferie { background: var(--ferie) !important; }
+        .ferie-header-name { font-size: 10px; color: #d81b60; font-weight: bold; line-height: 1; padding: 2px; }
+        .col-fixed { position: sticky; left: 0; background: #fff; width: 400px; text-align: left; z-index: 20; border-right: 5px solid var(--primary); padding: 8px 15px; }
+        .proj-name { cursor: pointer; color: var(--primary); text-decoration: none; }
+        .proj-name:hover { color: var(--accent); text-decoration: underline; }
+        .task-name { cursor: pointer; color: var(--accent); text-decoration: underline; font-weight: bold; }
+        .row-p { background: #e9ecef; font-weight: bold; }
+        .task-bar-cell { position: relative; padding: 0 !important; vertical-align: top; }
+        .task-bar { position: absolute; top: 2px; left: 2px; z-index: 10; border-radius: 4px; color: white; display: flex; flex-direction: column; gap: 2px; padding: 4px; font-size: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); pointer-events: none; overflow: hidden; box-sizing: border-box; }
+        .staff-tag { background: rgba(255,255,255,0.25); padding: 1px 5px; border-radius: 2px; white-space: nowrap; }
+        .modal { display: none; position: fixed; z-index: 100; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 450px; display: flex; flex-direction: column; gap: 12px; }
+        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>ASTEC GPAO <small style="font-size: 0.4em; color: var(--success);">● LIVE CLOUD</small></h1>
+    <div class="controls">
+        <button class="btn-blue" onclick="changeMonth(-1)">◀ Précédent</button>
+        <div id="date-display">Chargement...</div>
+        <button class="btn-blue" onclick="changeMonth(1)">Suivant ▶</button>
+        <button class="btn-green" onclick="openModalP()">+ Projet</button>
+        <button class="btn-blue" onclick="showModal('modalT')">+ Tâche</button>
+        <button style="background: #9b59b6;" onclick="showModal('modalPerso')">👥 Personnel</button>
+    </div>
+</div>
+
+<div class="gantt-container" id="gantt-table"></div>
+
+<div id="modalP" class="modal"><div class="modal-content">
+    <h3 id="modalP_title">Nouveau Projet</h3>
+    <input type="hidden" id="edit_proj_id">
+    <input type="text" id="p_aff" placeholder="N° Affaire">
+    <input type="text" id="p_cli" placeholder="Client">
+    <input type="text" id="p_nature" placeholder="Nature">
+    <input type="text" id="p_lie" placeholder="Lieu / Site">
+    <div style="display:flex; gap:10px;">
+        <button class="btn-green" id="btn_save_proj" style="flex:1" onclick="saveProject()">Enregistrer</button>
+        <button id="btn_del_proj" class="btn-red" style="display:none" onclick="delProject()">Supprimer</button>
+    </div>
+    <button class="btn-grey" onclick="hideModal('modalP')">Fermer</button>
+</div></div>
+
+<div id="modalT" class="modal"><div class="modal-content">
+    <h3>Détail Tâche</h3>
+    <input type="hidden" id="edit_task_id">
+    <select id="t_proj_sel"></select>
+    <input type="text" id="t_name" placeholder="Désignation">
+    <label>Personnel :</label>
+    <select id="t_staff_sel" multiple style="height: 100px;"></select>
+    <label>Début :</label><input type="date" id="t_start">
+    <label>Durée (jours ouvrés) :</label><input type="number" id="t_dur" value="1" min="1">
+    <div style="display:flex; gap:10px;">
+        <button class="btn-blue" style="flex:1" onclick="saveTask()">Enregistrer</button>
+        <button id="btn_del_task" class="btn-red" onclick="delTask()">Supprimer</button>
+    </div>
+    <button class="btn-grey" onclick="hideModal('modalT')">Annuler</button>
+</div></div>
+
+<div id="modalPerso" class="modal"><div class="modal-content">
+    <h3>Gestion Personnel</h3>
+    <div id="staff-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 10px; margin-bottom:10px;"></div>
+    <input type="text" id="new_staff" placeholder="Nom Prénom">
+    <button class="btn-green" onclick="addStaff()">Ajouter</button>
+    <button class="btn-red" onclick="hideModal('modalPerso')">Fermer</button>
+</div></div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    // --- CONFIGURATION FIREBASE (À REMPLIR) ---
+    const firebaseConfig = {
+             apiKey: "AIzaSyAGziDYYX7R-3MV5UX3UO4xy8iwWdOkgI8",
+             authDomain: "astec-gpao.firebaseapp.com",
+             databaseURL: "https://astec-gpao-default-rtdb.europe-west1.firebasedatabase.app",
+             projectId: "astec-gpao",
+             storageBucket: "astec-gpao.firebasestorage.app",
+             messagingSenderId: "1042124006828",
+             appId: "1:1042124006828:web:4ea7c467137cf4886b4609"
+            };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const stateRef = ref(db, 'gpao_data');
+
+    // --- VARIABLES D'ÉTAT ---
+    let state = { projects: [], tasks: [], staff: [] };
+    let viewDate = new Date(); viewDate.setDate(1);
+
+    // --- SYNCHRONISATION TEMPS RÉEL ---
+    onValue(stateRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            state = data;
+            if (!state.projects) state.projects = [];
+            if (!state.tasks) state.tasks = [];
+            if (!state.staff) state.staff = [];
+            render();
+        }
+    });
+
+    // --- FONCTIONS GLOBALISÉES (Accessibles par les boutons HTML) ---
+    window.saveState = function() {
+        set(stateRef, state);
+    };
+
+    window.changeMonth = function(n) {
+        viewDate.setMonth(viewDate.getMonth() + n);
+        render();
+    };
+
+    // --- LOGIQUE MÉTIER ---
+    function formatDateKey(date) {
+        const d = new Date(date);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function getFeries(year) {
+        const paques = (y) => {
+            const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451), n = Math.floor((h + l - 7 * m + 114) / 31), p = (h + l - 7 * m + 114) % 31;
+            return new Date(y, n - 1, p + 1);
+        };
+        const p = paques(year);
+        const lP = new Date(p); lP.setDate(p.getDate() + 1);
+        const asc = new Date(p); asc.setDate(p.getDate() + 39);
+        const lPent = new Date(p); lPent.setDate(p.getDate() + 50);
+        return {
+            [`${year}-01-01`]: "An", [`${year}-05-01`]: "Travail", [`${year}-05-08`]: "1945",
+            [`${year}-07-14`]: "National", [`${year}-08-15`]: "Assompt.", [`${year}-11-01`]: "Toussaint",
+            [`${year}-11-11`]: "Armist.", [`${year}-12-25`]: "Noël",
+            [formatDateKey(lP)]: "Pâques", [formatDateKey(asc)]: "Ascens.", [formatDateKey(lPent)]: "Pentec."
+        };
+    }
+
+    function getWeekNumber(d) {
+        d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+        return Math.ceil((((d - new Date(Date.UTC(d.getUTCFullYear(), 0, 1))) / 86400000) + 1) / 7);
+    }
+
+    window.render = function() {
+        const y = viewDate.getFullYear(), m = viewDate.getMonth();
+        const daysInM = new Date(y, m + 1, 0).getDate();
+        const feries = getFeries(y);
+        document.getElementById('date-display').innerText = viewDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'}).toUpperCase();
+
+        let rowWeeks = `<tr><th class="col-fixed" style="background:#f8f9fa">Semaines</th>`;
+        let rowFerieNames = `<tr><th class="col-fixed" style="background:#f8f9fa">Jours Fériés</th>`;
+        let rowDays = `<tr><th class="col-fixed">Affaire / Client / Site</th>`;
+
+        let weekSpan = 0;
+        for(let d=1; d<=daysInM; d++) {
+            let dt = new Date(y, m, d);
+            let ds = formatDateKey(dt);
+            let isFerie = feries[ds], isWeekend = (dt.getDay()===0||dt.getDay()===6), isMonday = (dt.getDay()===1);
+            weekSpan++;
+            if (dt.getDay() === 0 || d === daysInM) {
+                rowWeeks += `<th colspan="${weekSpan}" style="background:#f8f9fa; font-size:0.75em; border-bottom: 2px solid var(--accent);">Sem. ${getWeekNumber(dt)}</th>`;
+                weekSpan = 0;
+            }
+            rowFerieNames += `<th class="col-day ${isFerie ? 'ferie' : ''} ${isMonday ? 'sep-lundi' : ''}">${isFerie ? `<div class="ferie-header-name">${isFerie}</div>` : ''}</th>`;
+            rowDays += `<th class="col-day ${isWeekend ? 'weekend' : ''} ${isFerie ? 'ferie' : ''} ${isMonday ? 'sep-lundi' : ''}"><div style="font-size:0.8em;">${dt.toLocaleDateString('fr-FR', {weekday:'short'}).replace('.','')}</div><div>${String(d).padStart(2,'0')}</div></th>`;
+        }
+
+        let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
+
+        state.projects.forEach(p => {
+            html += `<tr class="row-p">
+                <td class="col-fixed">
+                    <span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} — ${p.cli}</b></span> | 📍 ${p.lie}
+                </td>
+                <td colspan="${daysInM}"></td></tr>`;
+
+            state.tasks.filter(t => t.pId === p.id).forEach(t => {
+                html += `<tr><td class="col-fixed" style="padding-left:30px;"><span class="task-name" onclick="editTask(${t.id})">${t.name}</span></td>`;
+                let sD = new Date(t.start), eD = new Date(t.end);
+                for(let d=1; d<=daysInM; d++) {
+                    let cur = new Date(y, m, d), ds = formatDateKey(cur), content = "";
+                    if (cur.toDateString() === sD.toDateString()) {
+                        let diff = Math.ceil((eD - sD) / (1000 * 60 * 60 * 24)) + 1;
+                        let width = Math.min(diff, daysInM - d + 1) * 50;
+                        content = `<div class="task-bar" style="background:${p.color}; width:${width-4}px;">${(t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('')}</div>`;
+                    }
+                    html += `<td class="col-day task-bar-cell ${cur.getDay()===0||cur.getDay()===6?'weekend':''} ${feries[ds]?'ferie':''} ${cur.getDay()===1?'sep-lundi':''}">${content}</td>`;
+                }
+                html += `</tr>`;
+            });
+        });
+        document.getElementById('gantt-table').innerHTML = html + `</tbody></table>`;
+        updateSelectors();
+    }
+
+    // --- GESTION PROJET ---
+    window.openModalP = function(id = null) {
+        if(id) {
+            const p = state.projects.find(x => x.id === id);
+            document.getElementById('modalP_title').innerText = "Modifier Projet";
+            document.getElementById('edit_proj_id').value = p.id;
+            document.getElementById('p_aff').value = p.aff;
+            document.getElementById('p_cli').value = p.cli;
+            document.getElementById('p_nature').value = p.nature || "";
+            document.getElementById('p_lie').value = p.lie;
+            document.getElementById('btn_del_proj').style.display = "block";
+        } else {
+            document.getElementById('modalP_title').innerText = "Nouveau Projet";
+            document.getElementById('edit_proj_id').value = "";
+            document.getElementById('p_aff').value = "";
+            document.getElementById('p_cli').value = "";
+            document.getElementById('p_nature').value = "";
+            document.getElementById('p_lie').value = "";
+            document.getElementById('btn_del_proj').style.display = "none";
+        }
+        showModal('modalP');
+    };
+
+    window.saveProject = function() {
+        const id = document.getElementById('edit_proj_id').value;
+        const data = {
+            aff: document.getElementById('p_aff').value,
+            cli: document.getElementById('p_cli').value,
+            nature: document.getElementById('p_nature').value,
+            lie: document.getElementById('p_lie').value
+        };
+        if(id) {
+            let idx = state.projects.findIndex(x => x.id === parseInt(id));
+            state.projects[idx] = { ...state.projects[idx], ...data };
+        } else {
+            state.projects.push({ id: Date.now(), ...data, color: `hsl(${Math.random()*360}, 65%, 45%)` });
+        }
+        window.saveState(); hideModal('modalP');
+    };
+
+    window.delProject = function() {
+        const id = parseInt(document.getElementById('edit_proj_id').value);
+        if(confirm("Supprimer ce projet et TOUTES ses tâches ?")) {
+            state.projects = state.projects.filter(x => x.id !== id);
+            state.tasks = state.tasks.filter(x => x.pId !== id);
+            window.saveState(); hideModal('modalP');
+        }
+    };
+
+    // --- GESTION TACHES ---
+    window.editTask = function(id) {
+        const t = state.tasks.find(x => x.id === id);
+        document.getElementById('edit_task_id').value = t.id;
+        document.getElementById('t_proj_sel').value = t.pId;
+        document.getElementById('t_name').value = t.name;
+        document.getElementById('t_start').value = t.start;
+        document.getElementById('t_dur').value = t.duration || 1;
+        const sel = document.getElementById('t_staff_sel');
+        Array.from(sel.options).forEach(opt => opt.selected = t.staff.includes(opt.value));
+        document.getElementById('btn_del_task').style.display = "block";
+        showModal('modalT');
+    };
+
+    window.saveTask = function() {
+        const id = document.getElementById('edit_task_id').value;
+        const start = document.getElementById('t_start').value;
+        const dur = parseInt(document.getElementById('t_dur').value);
+        const staff = Array.from(document.getElementById('t_staff_sel').selectedOptions).map(o => o.value);
+        if(!start || staff.length === 0) return alert("Veuillez remplir la date et le personnel.");
+
+        const taskData = {
+            id: id ? parseInt(id) : Date.now(),
+            pId: parseInt(document.getElementById('t_proj_sel').value),
+            name: document.getElementById('t_name').value,
+            staff: staff, start: start,
+            end: (function(s,days){
+                let d=new Date(s); let c=0;
+                while(c<days-1){ d.setDate(d.getDate()+1); if(d.getDay()!==0 && d.getDay()!==6)c++; }
+                return formatDateKey(d);
+            })(new Date(start), dur),
+            duration: dur
+        };
+        if(id) { state.tasks[state.tasks.findIndex(x => x.id === parseInt(id))] = taskData; }
+        else { state.tasks.push(taskData); }
+        window.saveState(); hideModal('modalT');
+    };
+
+    window.delTask = function() {
+        if(confirm("Supprimer ?")) {
+            state.tasks = state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value));
+            window.saveState(); hideModal('modalT');
+        }
+    };
+
+    // --- PERSONNEL ---
+    window.addStaff = function() {
+        let n = document.getElementById('new_staff').value;
+        if(n) {
+            if(!state.staff) state.staff = [];
+            state.staff.push(n); state.staff.sort();
+            window.saveState(); document.getElementById('new_staff').value='';
+        }
+    };
+
+    function updateSelectors() {
+        document.getElementById('t_proj_sel').innerHTML = (state.projects || []).map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
+        document.getElementById('t_staff_sel').innerHTML = (state.staff || []).map(s => `<option value="${s}">${s}</option>`).join('');
+        document.getElementById('staff-list').innerHTML = (state.staff || []).map(s => `<div>• ${s}</div>`).join('');
+    }
+
+    window.showModal = function(id) { document.getElementById(id).style.display = 'flex'; updateSelectors(); };
+    window.hideModal = function(id) {
+        document.getElementById(id).style.display = 'none';
+        if(id === 'modalT') document.getElementById('edit_task_id').value = "";
+    };
+
+    render();
+</script>
+</body>
+</html>
