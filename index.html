@@ -6,33 +6,140 @@
     <style>
         :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60; --weekend: #e8f5e9; --ferie: #fce4ec; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 20px; background: #f4f7f6; }
+
         .header { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 15px; }
+
         button { padding: 10px 15px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: 600; }
         .btn-blue { background: var(--accent); }
         .btn-green { background: var(--success); }
         .btn-red { background: var(--danger); }
         .btn-grey { background: #7f8c8d; }
+        .btn-orange { background: #e67e22; }
+
         #date-display { font-weight: bold; font-size: 1.2em; min-width: 220px; text-align: center; color: var(--primary); }
+
         .gantt-container { background: white; padding: 15px; border-radius: 8px; overflow-x: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); min-height: 400px; }
         table { border-collapse: collapse; width: max-content; min-width: 100%; position: relative; }
         th, td { border: 1px solid #ddd; padding: 0; text-align: center; min-height: 45px; }
+
         .col-day { width: 50px; min-width: 50px; height: 50px; position: relative; }
         .sep-lundi { border-left: 3px solid #bdc3c7 !important; }
         .weekend { background: var(--weekend) !important; }
         .ferie { background: var(--ferie) !important; }
+
         .ferie-header-name { font-size: 10px; color: #d81b60; font-weight: bold; line-height: 1; padding: 2px; }
-        .col-fixed { position: sticky; left: 0; background: #fff; width: 400px; text-align: left; z-index: 20; border-right: 5px solid var(--primary); padding: 8px 15px; }
+
+        .col-fixed {
+            position: sticky; left: 0; background: #fff; width: 400px;
+            text-align: left; z-index: 20; border-right: 5px solid var(--primary);
+            padding: 8px 15px;
+        }
+
         .proj-name { cursor: pointer; color: var(--primary); text-decoration: none; }
         .proj-name:hover { color: var(--accent); text-decoration: underline; }
         .task-name { cursor: pointer; color: var(--accent); text-decoration: underline; font-weight: bold; }
+
         .row-p { background: #e9ecef; font-weight: bold; }
         .task-bar-cell { position: relative; padding: 0 !important; vertical-align: top; }
-        .task-bar { position: absolute; top: 2px; left: 2px; z-index: 10; border-radius: 4px; color: white; display: flex; flex-direction: column; gap: 2px; padding: 4px; font-size: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); pointer-events: none; overflow: hidden; box-sizing: border-box; }
+        .task-bar {
+            position: absolute; top: 2px; left: 2px; z-index: 10; border-radius: 4px;
+            color: white; display: flex; flex-direction: column; gap: 2px; padding: 4px;
+            font-size: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            overflow: hidden; box-sizing: border-box;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: box-shadow 0.2s;
+        }
+
+        .task-bar:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .task-bar.selected {
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.5);
+            z-index: 15;
+        }
+
         .staff-tag { background: rgba(255,255,255,0.25); padding: 1px 5px; border-radius: 2px; white-space: nowrap; }
+
+        .resize-handle {
+            position: absolute;
+            top: 0;
+            width: 8px;
+            height: 100%;
+            cursor: ew-resize;
+            z-index: 20;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .task-bar.selected .resize-handle {
+            opacity: 1;
+            background: rgba(255,255,255,0.3);
+        }
+
+        .resize-handle:hover {
+            background: rgba(255,255,255,0.5) !important;
+        }
+
+        .resize-handle.left { left: 0; border-radius: 4px 0 0 4px; }
+        .resize-handle.right { right: 0; border-radius: 0 4px 4px 0; }
+
         .modal { display: none; position: fixed; z-index: 100; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
         .modal-content { background: white; padding: 25px; border-radius: 8px; width: 450px; display: flex; flex-direction: column; gap: 12px; }
         input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+
+        .checkbox-container { display: flex; align-items: center; gap: 8px; }
+        .checkbox-container input[type="checkbox"] { width: auto; }
+
+        /* Quick edit modal */
+        .quick-edit-modal {
+            position: absolute;
+            background: white;
+            border: 2px solid var(--accent);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 200;
+            min-width: 250px;
+        }
+
+        .quick-edit-modal h4 {
+            margin: 0 0 10px 0;
+            color: var(--primary);
+        }
+
+        .staff-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 5px 0;
+        }
+
+        .staff-checkbox input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+
+        /* STYLES D'IMPRESSION */
+        @media print {
+            @page { size: A3 landscape; margin: 10mm; }
+            body { margin: 0; padding: 0; background: white; }
+            .header, .controls, .no-print { display: none !important; }
+            .gantt-container { padding: 0; box-shadow: none; overflow: visible; }
+            .col-fixed { position: relative; border-right: 2px solid var(--primary); }
+            table { page-break-inside: avoid; font-size: 11px; }
+            th, td { padding: 4px 2px; }
+            .col-day { width: 40px; min-width: 40px; height: 40px; }
+            .task-bar { font-size: 8px; padding: 2px; }
+            .staff-tag { padding: 0px 3px; font-size: 7px; }
+            .print-header { display: block !important; margin-bottom: 15px; }
+            .print-hide-staff .staff-tag { display: none !important; }
+            .resize-handle { display: none !important; }
+        }
+
+        .print-header { display: none; font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 20px; color: var(--primary); }
     </style>
 </head>
 <body>
@@ -46,8 +153,11 @@
         <button class="btn-green" onclick="openModalP()">+ Projet</button>
         <button class="btn-blue" onclick="showModal('modalT')">+ Tâche</button>
         <button style="background: #9b59b6;" onclick="showModal('modalPerso')">👥 Personnel</button>
+        <button class="btn-orange" onclick="showModal('modalPrint')">🖨️ Imprimer PDF</button>
     </div>
 </div>
+
+<div class="print-header" id="print-header"></div>
 
 <div class="gantt-container" id="gantt-table"></div>
 
@@ -59,7 +169,7 @@
     <input type="text" id="p_nature" placeholder="Nature">
     <input type="text" id="p_lie" placeholder="Lieu / Site">
     <div style="display:flex; gap:10px;">
-        <button class="btn-green" id="btn_save_proj" style="flex:1" onclick="saveProject()">Enregistrer</button>
+        <button class="btn-green" id="btn_save_proj" style="flex:1" onclick="saveProject()">Créer</button>
         <button id="btn_del_proj" class="btn-red" style="display:none" onclick="delProject()">Supprimer</button>
     </div>
     <button class="btn-grey" onclick="hideModal('modalP')">Fermer</button>
@@ -89,20 +199,34 @@
     <button class="btn-red" onclick="hideModal('modalPerso')">Fermer</button>
 </div></div>
 
+<div id="modalPrint" class="modal"><div class="modal-content">
+    <h3>🖨️ Imprimer au format PDF</h3>
+    <label><b>Sélectionner le projet :</b></label>
+    <select id="print_proj_sel"></select>
+    <label><b>Date de début (4 semaines) :</b></label>
+    <input type="date" id="print_start_date">
+    <div class="checkbox-container">
+        <input type="checkbox" id="print_show_staff" checked>
+        <label for="print_show_staff"><b>Afficher les noms du personnel</b></label>
+    </div>
+    <button class="btn-orange" onclick="printPDF()">📄 Générer PDF</button>
+    <button class="btn-grey" onclick="hideModal('modalPrint')">Annuler</button>
+</div></div>
+
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    // --- CONFIGURATION FIREBASE (À REMPLIR) ---
+    // --- CONFIGURATION FIREBASE ---
     const firebaseConfig = {
-             apiKey: "AIzaSyAGziDYYX7R-3MV5UX3UO4xy8iwWdOkgI8",
-             authDomain: "astec-gpao.firebaseapp.com",
-             databaseURL: "https://astec-gpao-default-rtdb.europe-west1.firebasedatabase.app",
-             projectId: "astec-gpao",
-             storageBucket: "astec-gpao.firebasestorage.app",
-             messagingSenderId: "1042124006828",
-             appId: "1:1042124006828:web:4ea7c467137cf4886b4609"
-            };
+        apiKey: "AIzaSyAGziDYYX7R-3MV5UX3UO4xy8iwWdOkgI8",
+        authDomain: "astec-gpao.firebaseapp.com",
+        databaseURL: "https://astec-gpao-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "astec-gpao",
+        storageBucket: "astec-gpao.firebasestorage.app",
+        messagingSenderId: "1042124006828",
+        appId: "1:1042124006828:web:4ea7c467137cf4886b4609"
+    };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
@@ -111,6 +235,10 @@
     // --- VARIABLES D'ÉTAT ---
     let state = { projects: [], tasks: [], staff: [] };
     let viewDate = new Date(); viewDate.setDate(1);
+    let selectedTaskId = null;
+    let isResizing = false;
+    let resizeData = null;
+    let quickEditModal = null;
 
     // --- SYNCHRONISATION TEMPS RÉEL ---
     onValue(stateRef, (snapshot) => {
@@ -124,17 +252,7 @@
         }
     });
 
-    // --- FONCTIONS GLOBALISÉES (Accessibles par les boutons HTML) ---
-    window.saveState = function() {
-        set(stateRef, state);
-    };
-
-    window.changeMonth = function(n) {
-        viewDate.setMonth(viewDate.getMonth() + n);
-        render();
-    };
-
-    // --- LOGIQUE MÉTIER ---
+    // --- FONCTIONS UTILITAIRES ---
     function formatDateKey(date) {
         const d = new Date(date);
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -163,6 +281,182 @@
         return Math.ceil((((d - new Date(Date.UTC(d.getUTCFullYear(), 0, 1))) / 86400000) + 1) / 7);
     }
 
+    function addBusinessDays(startDate, days) {
+        let d = new Date(startDate);
+        let c = 0;
+        while (c < days - 1) {
+            d.setDate(d.getDate() + 1);
+            if (d.getDay() !== 0 && d.getDay() !== 6) c++;
+        }
+        return formatDateKey(d);
+    }
+
+    function countBusinessDays(start, end) {
+        let count = 0;
+        let current = new Date(start);
+        let endDate = new Date(end);
+        while (current <= endDate) {
+            if (current.getDay() !== 0 && current.getDay() !== 6) count++;
+            current.setDate(current.getDate() + 1);
+        }
+        return count;
+    }
+
+    window.saveState = function() {
+        set(stateRef, state);
+    };
+
+    // GESTION DE LA SÉLECTION ET INTERACTION DES TÂCHES
+    function selectTask(taskId, event) {
+        event.stopPropagation();
+        closeQuickEditModal();
+
+        if (selectedTaskId === taskId) {
+            selectedTaskId = null;
+        } else {
+            selectedTaskId = taskId;
+        }
+        render();
+    }
+
+    function onTaskDoubleClick(taskId, event) {
+        event.stopPropagation();
+        selectedTaskId = taskId;
+        showQuickEditModal(taskId, event);
+    }
+
+    function showQuickEditModal(taskId, event) {
+        closeQuickEditModal();
+
+        const task = state.tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const modal = document.createElement('div');
+        modal.className = 'quick-edit-modal';
+        modal.style.left = event.pageX + 'px';
+        modal.style.top = event.pageY + 'px';
+
+        let html = `<h4>👥 Personnel affecté</h4>`;
+        state.staff.forEach(s => {
+            const checked = task.staff.includes(s) ? 'checked' : '';
+            html += `
+                <div class="staff-checkbox">
+                    <input type="checkbox" id="quick_${s}" value="${s}" ${checked} 
+                           onchange="updateTaskStaff(${taskId}, this.value, this.checked)">
+                    <label for="quick_${s}">${s}</label>
+                </div>
+            `;
+        });
+        html += `<button class="btn-grey" style="margin-top:10px; width:100%;" onclick="closeQuickEditModal()">Fermer</button>`;
+
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+        quickEditModal = modal;
+
+        setTimeout(() => {
+            document.addEventListener('click', closeQuickEditModalOnOutsideClick);
+        }, 100);
+    }
+
+    function closeQuickEditModalOnOutsideClick(event) {
+        if (quickEditModal && !quickEditModal.contains(event.target)) {
+            closeQuickEditModal();
+        }
+    }
+
+    window.closeQuickEditModal = function() {
+        if (quickEditModal) {
+            quickEditModal.remove();
+            quickEditModal = null;
+            document.removeEventListener('click', closeQuickEditModalOnOutsideClick);
+        }
+    };
+
+    window.updateTaskStaff = function(taskId, staffName, isChecked) {
+        const task = state.tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        if (isChecked) {
+            if (!task.staff.includes(staffName)) {
+                task.staff.push(staffName);
+            }
+        } else {
+            task.staff = task.staff.filter(s => s !== staffName);
+        }
+
+        if (task.staff.length === 0) {
+            alert("Au moins une personne doit être affectée à la tâche.");
+            task.staff.push(staffName);
+            document.getElementById(`quick_${staffName}`).checked = true;
+            return;
+        }
+
+        window.saveState();
+    };
+
+    // GESTION DU REDIMENSIONNEMENT
+    window.startResize = function(taskId, direction, event) {
+        event.stopPropagation();
+        isResizing = true;
+        
+        const task = state.tasks.find(t => t.id === taskId);
+        resizeData = {
+            taskId: taskId,
+            direction: direction,
+            startX: event.pageX,
+            originalStart: new Date(task.start),
+            originalEnd: new Date(task.end)
+        };
+
+        document.addEventListener('mousemove', handleResize);
+        document.addEventListener('mouseup', endResize);
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+    };
+
+    function handleResize(event) {
+        if (!isResizing || !resizeData) return;
+
+        const deltaX = event.pageX - resizeData.startX;
+        const daysDelta = Math.round(deltaX / 50);
+
+        if (daysDelta === 0) return;
+
+        const task = state.tasks.find(t => t.id === resizeData.taskId);
+        if (!task) return;
+
+        let newStart = new Date(resizeData.originalStart);
+        let newEnd = new Date(resizeData.originalEnd);
+
+        if (resizeData.direction === 'left') {
+            newStart.setDate(newStart.getDate() + daysDelta);
+            if (newStart >= newEnd) return;
+        } else {
+            newEnd.setDate(newEnd.getDate() + daysDelta);
+            if (newEnd <= newStart) return;
+        }
+
+        const duration = countBusinessDays(newStart, newEnd);
+        
+        task.start = formatDateKey(newStart);
+        task.end = formatDateKey(newEnd);
+        task.duration = duration;
+
+        render();
+    }
+
+    function endResize() {
+        if (isResizing) {
+            isResizing = false;
+            resizeData = null;
+            document.removeEventListener('mousemove', handleResize);
+            document.removeEventListener('mouseup', endResize);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            window.saveState();
+        }
+    }
+
     window.render = function() {
         const y = viewDate.getFullYear(), m = viewDate.getMonth();
         const daysInM = new Date(y, m + 1, 0).getDate();
@@ -178,6 +472,7 @@
             let dt = new Date(y, m, d);
             let ds = formatDateKey(dt);
             let isFerie = feries[ds], isWeekend = (dt.getDay()===0||dt.getDay()===6), isMonday = (dt.getDay()===1);
+
             weekSpan++;
             if (dt.getDay() === 0 || d === daysInM) {
                 rowWeeks += `<th colspan="${weekSpan}" style="background:#f8f9fa; font-size:0.75em; border-bottom: 2px solid var(--accent);">Sem. ${getWeekNumber(dt)}</th>`;
@@ -192,7 +487,8 @@
         state.projects.forEach(p => {
             html += `<tr class="row-p">
                 <td class="col-fixed">
-                    <span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} — ${p.cli}</b></span> | 📍 ${p.lie}
+                    <span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} – ${p.cli}</b></span> | 📍 ${p.lie}
+                    <br><small>${p.nature || ''}</small>
                 </td>
                 <td colspan="${daysInM}"></td></tr>`;
 
@@ -204,7 +500,15 @@
                     if (cur.toDateString() === sD.toDateString()) {
                         let diff = Math.ceil((eD - sD) / (1000 * 60 * 60 * 24)) + 1;
                         let width = Math.min(diff, daysInM - d + 1) * 50;
-                        content = `<div class="task-bar" style="background:${p.color}; width:${width-4}px;">${(t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('')}</div>`;
+                        const isSelected = selectedTaskId === t.id ? 'selected' : '';
+                        content = `<div class="task-bar ${isSelected}" 
+                                        style="background:${p.color}; width:${width-4}px;" 
+                                        onclick="selectTask(${t.id}, event)"
+                                        ondblclick="onTaskDoubleClick(${t.id}, event)">
+                                        <div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', event)"></div>
+                                        ${(t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('')}
+                                        <div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', event)"></div>
+                                   </div>`;
                     }
                     html += `<td class="col-day task-bar-cell ${cur.getDay()===0||cur.getDay()===6?'weekend':''} ${feries[ds]?'ferie':''} ${cur.getDay()===1?'sep-lundi':''}">${content}</td>`;
                 }
@@ -213,27 +517,139 @@
         });
         document.getElementById('gantt-table').innerHTML = html + `</tbody></table>`;
         updateSelectors();
+    };
+
+    // Désélectionner quand on clique en dehors
+    document.addEventListener('click', () => {
+        if (!isResizing) {
+            selectedTaskId = null;
+            render();
+        }
+    });
+
+    // FONCTION IMPRESSION PDF
+    window.printPDF = function() {
+        const projId = parseInt(document.getElementById('print_proj_sel').value);
+        const startDate = new Date(document.getElementById('print_start_date').value);
+        const showStaff = document.getElementById('print_show_staff').checked;
+        
+        if (!projId || !startDate || isNaN(startDate)) {
+            alert("Veuillez sélectionner un projet et une date de début.");
+            return;
+        }
+
+        const project = state.projects.find(p => p.id === projId);
+        if (!project) return;
+
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 27);
+
+        const html = generatePrintTable(project, startDate, endDate, showStaff);
+        
+        const ganttTable = document.getElementById('gantt-table');
+        const originalContent = ganttTable.innerHTML;
+        ganttTable.innerHTML = html;
+
+        const printHeader = document.getElementById('print-header');
+        printHeader.innerHTML = `${project.aff} – ${project.cli} | ${project.lie}<br><small style="font-size:14px;">Du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')}</small>`;
+
+        if (!showStaff) {
+            document.body.classList.add('print-hide-staff');
+        }
+
+        hideModal('modalPrint');
+
+        setTimeout(() => {
+            window.print();
+            ganttTable.innerHTML = originalContent;
+            printHeader.innerHTML = '';
+            document.body.classList.remove('print-hide-staff');
+        }, 100);
+    };
+
+    function generatePrintTable(project, startDate, endDate, showStaff) {
+        const days = [];
+        let current = new Date(startDate);
+        while (current <= endDate) {
+            days.push(new Date(current));
+            current.setDate(current.getDate() + 1);
+        }
+
+        const feries = { ...getFeries(startDate.getFullYear()), ...getFeries(endDate.getFullYear()) };
+
+        let rowWeeks = `<tr><th class="col-fixed" style="background:#f8f9fa">Semaines</th>`;
+        let rowFerieNames = `<tr><th class="col-fixed" style="background:#f8f9fa">Jours Fériés</th>`;
+        let rowDays = `<tr><th class="col-fixed">Affaire / Client / Site</th>`;
+
+        let weekSpan = 0;
+        days.forEach((dt, idx) => {
+            let ds = formatDateKey(dt);
+            let isFerie = feries[ds], isWeekend = (dt.getDay()===0||dt.getDay()===6), isMonday = (dt.getDay()===1);
+
+            weekSpan++;
+            if (dt.getDay() === 0 || idx === days.length - 1) {
+                rowWeeks += `<th colspan="${weekSpan}" style="background:#f8f9fa; font-size:0.75em; border-bottom: 2px solid var(--accent);">Sem. ${getWeekNumber(dt)}</th>`;
+                weekSpan = 0;
+            }
+            rowFerieNames += `<th class="col-day ${isFerie ? 'ferie' : ''} ${isMonday ? 'sep-lundi' : ''}">${isFerie ? `<div class="ferie-header-name">${isFerie}</div>` : ''}</th>`;
+            rowDays += `<th class="col-day ${isWeekend ? 'weekend' : ''} ${isFerie ? 'ferie' : ''} ${isMonday ? 'sep-lundi' : ''}"><div style="font-size:0.8em;">${dt.toLocaleDateString('fr-FR', {weekday:'short'}).replace('.','')}</div><div>${String(dt.getDate()).padStart(2,'0')}</div></th>`;
+        });
+
+        let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
+
+        html += `<tr class="row-p">
+            <td class="col-fixed">
+                <b>${project.aff} – ${project.cli}</b> | 📍 ${project.lie}
+                <br><small>${project.nature || ''}</small>
+            </td>
+            <td colspan="${days.length}"></td></tr>`;
+
+        state.tasks.filter(t => t.pId === project.id).forEach(t => {
+            html += `<tr><td class="col-fixed" style="padding-left:30px;">${t.name}</td>`;
+            let sD = new Date(t.start), eD = new Date(t.end);
+            
+            days.forEach((cur, idx) => {
+                let ds = formatDateKey(cur), content = "";
+                if (cur.toDateString() === sD.toDateString()) {
+                    let diff = Math.ceil((eD - sD) / (1000 * 60 * 60 * 24)) + 1;
+                    let width = Math.min(diff, days.length - idx) * 40;
+                    let staffHTML = showStaff ? (t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('') : '';
+                    content = `<div class="task-bar" style="background:${project.color}; width:${width-4}px;">${staffHTML}</div>`;
+                }
+                html += `<td class="col-day task-bar-cell ${cur.getDay()===0||cur.getDay()===6?'weekend':''} ${feries[ds]?'ferie':''} ${cur.getDay()===1?'sep-lundi':''}">${content}</td>`;
+            });
+            html += `</tr>`;
+        });
+
+        return html + `</tbody></table>`;
     }
 
-    // --- GESTION PROJET ---
+    // GESTION PROJET
     window.openModalP = function(id = null) {
+        const modal = document.getElementById('modalP');
+        const title = document.getElementById('modalP_title');
+        const btnSave = document.getElementById('btn_save_proj');
+        const btnDel = document.getElementById('btn_del_proj');
+
         if(id) {
             const p = state.projects.find(x => x.id === id);
-            document.getElementById('modalP_title').innerText = "Modifier Projet";
+            title.innerText = "Modifier Projet";
             document.getElementById('edit_proj_id').value = p.id;
             document.getElementById('p_aff').value = p.aff;
             document.getElementById('p_cli').value = p.cli;
             document.getElementById('p_nature').value = p.nature || "";
             document.getElementById('p_lie').value = p.lie;
-            document.getElementById('btn_del_proj').style.display = "block";
+            btnSave.innerText = "Mettre à jour";
+            btnDel.style.display = "block";
         } else {
-            document.getElementById('modalP_title').innerText = "Nouveau Projet";
+            title.innerText = "Nouveau Projet";
             document.getElementById('edit_proj_id').value = "";
             document.getElementById('p_aff').value = "";
             document.getElementById('p_cli').value = "";
             document.getElementById('p_nature').value = "";
             document.getElementById('p_lie').value = "";
-            document.getElementById('btn_del_proj').style.display = "none";
+            btnSave.innerText = "Créer";
+            btnDel.style.display = "none";
         }
         showModal('modalP');
     };
@@ -246,11 +662,15 @@
             nature: document.getElementById('p_nature').value,
             lie: document.getElementById('p_lie').value
         };
+
         if(id) {
             let idx = state.projects.findIndex(x => x.id === parseInt(id));
             state.projects[idx] = { ...state.projects[idx], ...data };
         } else {
-            state.projects.push({ id: Date.now(), ...data, color: `hsl(${Math.random()*360}, 65%, 45%)` });
+            state.projects.push({
+                id: Date.now(), ...data,
+                color: `hsl(${Math.random()*360}, 65%, 45%)`
+            });
         }
         window.saveState(); hideModal('modalP');
     };
@@ -264,7 +684,7 @@
         }
     };
 
-    // --- GESTION TACHES ---
+    // GESTION TACHES
     window.editTask = function(id) {
         const t = state.tasks.find(x => x.id === id);
         document.getElementById('edit_task_id').value = t.id;
@@ -290,11 +710,7 @@
             pId: parseInt(document.getElementById('t_proj_sel').value),
             name: document.getElementById('t_name').value,
             staff: staff, start: start,
-            end: (function(s,days){
-                let d=new Date(s); let c=0;
-                while(c<days-1){ d.setDate(d.getDate()+1); if(d.getDay()!==0 && d.getDay()!==6)c++; }
-                return formatDateKey(d);
-            })(new Date(start), dur),
+            end: addBusinessDays(new Date(start), dur),
             duration: dur
         };
         if(id) { state.tasks[state.tasks.findIndex(x => x.id === parseInt(id))] = taskData; }
@@ -302,27 +718,32 @@
         window.saveState(); hideModal('modalT');
     };
 
-    window.delTask = function() {
-        if(confirm("Supprimer ?")) {
-            state.tasks = state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value));
-            window.saveState(); hideModal('modalT');
-        }
+    window.delTask = function() { 
+        if(confirm("Supprimer ?")) { 
+            state.tasks = state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value)); 
+            window.saveState(); hideModal('modalT'); 
+        } 
     };
 
-    // --- PERSONNEL ---
-    window.addStaff = function() {
-        let n = document.getElementById('new_staff').value;
-        if(n) {
-            if(!state.staff) state.staff = [];
-            state.staff.push(n); state.staff.sort();
-            window.saveState(); document.getElementById('new_staff').value='';
-        }
+    // AUTRES
+    window.addStaff = function() { 
+        let n = document.getElementById('new_staff').value; 
+        if(n) { 
+            state.staff.push(n); 
+            state.staff.sort(); 
+            window.saveState(); 
+            document.getElementById('new_staff').value=''; 
+        } 
     };
 
     function updateSelectors() {
         document.getElementById('t_proj_sel').innerHTML = (state.projects || []).map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
         document.getElementById('t_staff_sel').innerHTML = (state.staff || []).map(s => `<option value="${s}">${s}</option>`).join('');
         document.getElementById('staff-list').innerHTML = (state.staff || []).map(s => `<div>• ${s}</div>`).join('');
+        document.getElementById('print_proj_sel').innerHTML = (state.projects || []).map(p => `<option value="${p.id}">${p.aff} – ${p.cli}</option>`).join('');
+        
+        const today = new Date();
+        document.getElementById('print_start_date').value = formatDateKey(today);
     }
 
     window.showModal = function(id) { document.getElementById(id).style.display = 'flex'; updateSelectors(); };
@@ -330,6 +751,10 @@
         document.getElementById(id).style.display = 'none';
         if(id === 'modalT') document.getElementById('edit_task_id').value = "";
     };
+
+    window.changeMonth = function(n) { viewDate.setMonth(viewDate.getMonth() + n); render(); };
+    window.selectTask = selectTask;
+    window.onTaskDoubleClick = onTaskDoubleClick;
 
     render();
 </script>
