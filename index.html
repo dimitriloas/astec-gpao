@@ -737,16 +737,34 @@
     };
 
     function updateSelectors() {
+        // Sauvegarder les sélections actuelles du personnel
+        const staffSel = document.getElementById('t_staff_sel');
+        const currentSelections = Array.from(staffSel.selectedOptions || []).map(o => o.value);
+        
+        // Mettre à jour les options
         document.getElementById('t_proj_sel').innerHTML = (state.projects || []).map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
         document.getElementById('t_staff_sel').innerHTML = (state.staff || []).map(s => `<option value="${s}">${s}</option>`).join('');
         document.getElementById('staff-list').innerHTML = (state.staff || []).map(s => `<div>• ${s}</div>`).join('');
         document.getElementById('print_proj_sel').innerHTML = (state.projects || []).map(p => `<option value="${p.id}">${p.aff} – ${p.cli}</option>`).join('');
         
+        // Restaurer les sélections du personnel
+        Array.from(staffSel.options).forEach(opt => {
+            if (currentSelections.includes(opt.value)) {
+                opt.selected = true;
+            }
+        });
+        
         const today = new Date();
         document.getElementById('print_start_date').value = formatDateKey(today);
     }
 
-    window.showModal = function(id) { document.getElementById(id).style.display = 'flex'; updateSelectors(); };
+    window.showModal = function(id) { 
+        document.getElementById(id).style.display = 'flex'; 
+        if (id !== 'modalT' || !document.getElementById('edit_task_id').value) {
+            // Ne mettre à jour les selects que si ce n'est pas une édition de tâche en cours
+            updateSelectors(); 
+        }
+    };
     window.hideModal = function(id) {
         document.getElementById(id).style.display = 'none';
         if(id === 'modalT') document.getElementById('edit_task_id').value = "";
