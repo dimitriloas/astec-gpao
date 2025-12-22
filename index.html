@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>ASTEC GPAO - Cloud Collaborative</title>
     <style>
         :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60; --weekend: #e8f5e9; --ferie: #fce4ec; }
@@ -16,6 +16,7 @@
         .btn-red { background: var(--danger); }
         .btn-grey { background: #7f8c8d; }
         .btn-orange { background: #e67e22; }
+        .btn-small { padding: 5px 10px; font-size: 0.85em; }
 
         #date-display { font-weight: bold; font-size: 1.2em; min-width: 220px; text-align: center; color: var(--primary); }
 
@@ -93,6 +94,19 @@
         .checkbox-container { display: flex; align-items: center; gap: 8px; }
         .checkbox-container input[type="checkbox"] { width: auto; }
 
+        /* Liste du personnel avec bouton supprimer */
+        .staff-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .staff-item:hover {
+            background: #f8f9fa;
+        }
+
         /* Quick edit modal */
         .quick-edit-modal {
             position: absolute;
@@ -122,6 +136,13 @@
             margin: 0;
         }
 
+        .no-tasks-message {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-style: italic;
+        }
+
         /* STYLES D'IMPRESSION */
         @media print {
             @page { size: A3 landscape; margin: 10mm; }
@@ -148,7 +169,7 @@
     <h1>ASTEC GPAO <small style="font-size: 0.4em; color: var(--success);">● LIVE CLOUD</small></h1>
     <div class="controls">
         <button class="btn-blue" onclick="changeMonth(-1)">◀ Précédent</button>
-        <div id="date-display">Chargement...</div>
+        <div id="date-display">DÉCEMBRE 2025</div>
         <button class="btn-blue" onclick="changeMonth(1)">Suivant ▶</button>
         <button class="btn-green" onclick="openModalP()">+ Projet</button>
         <button class="btn-blue" onclick="showModal('modalT')">+ Tâche</button>
@@ -159,7 +180,9 @@
 
 <div class="print-header" id="print-header"></div>
 
-<div class="gantt-container" id="gantt-table"></div>
+<div class="gantt-container" id="gantt-table">
+    <div class="no-tasks-message">Chargement...</div>
+</div>
 
 <div id="modalP" class="modal"><div class="modal-content">
     <h3 id="modalP_title">Nouveau Projet</h3>
@@ -193,13 +216,13 @@
 
 <div id="modalPerso" class="modal"><div class="modal-content">
     <h3>Gestion Personnel</h3>
-    <div id="staff-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 10px; margin-bottom:10px;"></div>
+    <div id="staff-list" style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; margin-bottom:10px;"></div>
     <input type="text" id="new_staff" placeholder="Nom Prénom">
     <button class="btn-green" onclick="addStaff()">Ajouter</button>
-    <button class="btn-red" onclick="hideModal('modalPerso')">Fermer</button>
+    <button class="btn-grey" onclick="hideModal('modalPerso')">Fermer</button>
 </div></div>
 
-<div id="modalPrint" class="modal"><div class="modal-content">
+<div id="modalPrint" class="modal" style="display: none;"><div class="modal-content">
     <h3>🖨️ Imprimer au format PDF</h3>
     <label><b>Sélectionner le projet :</b></label>
     <select id="print_proj_sel"></select>
@@ -300,6 +323,17 @@
             current.setDate(current.getDate() + 1);
         }
         return count;
+    }
+
+    // NOUVELLE FONCTION : Vérifier si une tâche est dans le mois affiché
+    function isTaskInMonth(task, year, month) {
+        const taskStart = new Date(task.start);
+        const taskEnd = new Date(task.end);
+        const monthStart = new Date(year, month, 1);
+        const monthEnd = new Date(year, month + 1, 0);
+        
+        // La tâche chevauche le mois si elle commence avant la fin du mois ET finit après le début du mois
+        return taskStart <= monthEnd && taskEnd >= monthStart;
     }
 
     window.saveState = function() {
@@ -463,6 +497,12 @@
         const feries = getFeries(y);
         document.getElementById('date-display').innerText = viewDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'}).toUpperCase();
 
+        // AMÉLIORATION : Filtrer les projets qui ont des tâches dans le mois affiché
+        const visibleProjects = state.projects.filter(p => {
+            const projectTasks = state.tasks.filter(t => t.pId === p.id);
+            return projectTasks.some(task => isTaskInMonth(task, y, m));
+        });
+
         let rowWeeks = `<tr><th class="col-fixed" style="background:#f8f9fa">Semaines</th>`;
         let rowFerieNames = `<tr><th class="col-fixed" style="background:#f8f9fa">Jours Fériés</th>`;
         let rowDays = `<tr><th class="col-fixed">Affaire / Client / Site</th>`;
@@ -484,37 +524,42 @@
 
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
 
-        state.projects.forEach(p => {
-            html += `<tr class="row-p">
-                <td class="col-fixed">
-                    <span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} – ${p.cli}</b></span> | 📍 ${p.lie}
-                    <br><small>${p.nature || ''}</small>
-                </td>
-                <td colspan="${daysInM}"></td></tr>`;
+        // AMÉLIORATION : Afficher uniquement les projets avec des tâches dans le mois
+        if (visibleProjects.length === 0) {
+            html += `<tr><td colspan="${daysInM + 1}" class="no-tasks-message">Aucune tâche prévue ce mois-ci</td></tr>`;
+        } else {
+            visibleProjects.forEach(p => {
+                html += `<tr class="row-p">
+                    <td class="col-fixed">
+                        <span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} – ${p.cli}</b></span> | 📍 ${p.lie}
+                        <br><small>${p.nature || ''}</small>
+                    </td>
+                    <td colspan="${daysInM}"></td></tr>`;
 
-            state.tasks.filter(t => t.pId === p.id).forEach(t => {
-                html += `<tr><td class="col-fixed" style="padding-left:30px;"><span class="task-name" onclick="editTask(${t.id})">${t.name}</span></td>`;
-                let sD = new Date(t.start), eD = new Date(t.end);
-                for(let d=1; d<=daysInM; d++) {
-                    let cur = new Date(y, m, d), ds = formatDateKey(cur), content = "";
-                    if (cur.toDateString() === sD.toDateString()) {
-                        let diff = Math.ceil((eD - sD) / (1000 * 60 * 60 * 24)) + 1;
-                        let width = Math.min(diff, daysInM - d + 1) * 50;
-                        const isSelected = selectedTaskId === t.id ? 'selected' : '';
-                        content = `<div class="task-bar ${isSelected}" 
-                                        style="background:${p.color}; width:${width-4}px;" 
-                                        onclick="selectTask(${t.id}, event)"
-                                        ondblclick="onTaskDoubleClick(${t.id}, event)">
-                                        <div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', event)"></div>
-                                        ${(t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('')}
-                                        <div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', event)"></div>
-                                   </div>`;
+                state.tasks.filter(t => t.pId === p.id && isTaskInMonth(t, y, m)).forEach(t => {
+                    html += `<tr><td class="col-fixed" style="padding-left:30px;"><span class="task-name" onclick="editTask(${t.id})">${t.name}</span></td>`;
+                    let sD = new Date(t.start), eD = new Date(t.end);
+                    for(let d=1; d<=daysInM; d++) {
+                        let cur = new Date(y, m, d), ds = formatDateKey(cur), content = "";
+                        if (cur.toDateString() === sD.toDateString()) {
+                            let diff = Math.ceil((eD - sD) / (1000 * 60 * 60 * 24)) + 1;
+                            let width = Math.min(diff, daysInM - d + 1) * 50;
+                            const isSelected = selectedTaskId === t.id ? 'selected' : '';
+                            content = `<div class="task-bar ${isSelected}" 
+                                            style="background:${p.color}; width:${width-4}px;" 
+                                            onclick="selectTask(${t.id}, event)"
+                                            ondblclick="onTaskDoubleClick(${t.id}, event)">
+                                            <div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', event)"></div>
+                                            ${(t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('')}
+                                            <div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', event)"></div>
+                                       </div>`;
+                        }
+                        html += `<td class="col-day task-bar-cell ${cur.getDay()===0||cur.getDay()===6?'weekend':''} ${feries[ds]?'ferie':''} ${cur.getDay()===1?'sep-lundi':''}">${content}</td>`;
                     }
-                    html += `<td class="col-day task-bar-cell ${cur.getDay()===0||cur.getDay()===6?'weekend':''} ${feries[ds]?'ferie':''} ${cur.getDay()===1?'sep-lundi':''}">${content}</td>`;
-                }
-                html += `</tr>`;
+                    html += `</tr>`;
+                });
             });
-        });
+        }
         document.getElementById('gantt-table').innerHTML = html + `</tbody></table>`;
     };
 
@@ -544,38 +589,29 @@
         }
 
         const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 27); // 4 semaines
+        endDate.setDate(endDate.getDate() + 27);
 
-        // Générer le HTML d'impression pour CE SEUL PROJET
         const printHtml = generatePrintTable(project, startDate, endDate, showStaff);
         
-        // Sauvegarder le contenu original
         const ganttTable = document.getElementById('gantt-table');
         const originalContent = ganttTable.innerHTML;
         
-        // Mettre à jour l'en-tête d'impression
         const printHeader = document.getElementById('print-header');
         const originalHeader = printHeader.innerHTML;
         printHeader.innerHTML = `${project.aff} – ${project.cli} | ${project.lie}<br><small style="font-size:14px;">Du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')}</small>`;
 
-        // Masquer/afficher les noms du personnel selon le choix
         if (!showStaff) {
             document.body.classList.add('print-hide-staff');
         }
 
-        // Fermer le modal AVANT de changer le contenu
         hideModal('modalPrint');
 
-        // Attendre que le modal soit fermé, PUIS remplacer le contenu
         setTimeout(() => {
-            // Remplacer par le contenu d'impression (UNIQUEMENT LE PROJET SÉLECTIONNÉ)
             ganttTable.innerHTML = printHtml;
             
-            // Lancer l'impression immédiatement
             setTimeout(() => {
                 window.print();
                 
-                // Restaurer le contenu original après l'impression
                 ganttTable.innerHTML = originalContent;
                 printHeader.innerHTML = originalHeader;
                 document.body.classList.remove('print-hide-staff');
@@ -618,7 +654,6 @@
 
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
 
-        // AFFICHER UNIQUEMENT LE PROJET SÉLECTIONNÉ
         html += `<tr class="row-p">
             <td class="col-fixed">
                 <b>${project.aff} – ${project.cli}</b> | 📍 ${project.lie}
@@ -626,7 +661,6 @@
             </td>
             <td colspan="${days.length}"></td></tr>`;
 
-        // AFFICHER UNIQUEMENT LES TÂCHES DU PROJET SÉLECTIONNÉ
         const projectTasks = state.tasks.filter(t => t.pId === project.id);
         
         if (projectTasks.length === 0) {
@@ -715,9 +749,7 @@
 
     // GESTION TACHES
     window.editTask = function(id) {
-        // Juste définir l'ID de la tâche à éditer
         document.getElementById('edit_task_id').value = id;
-        // showModal() s'occupera de charger toutes les données
         showModal('modalT');
     };
 
@@ -742,16 +774,20 @@
     };
 
     window.delTask = function() { 
-        if(confirm("Supprimer ?")) { 
+        if(confirm("Supprimer cette tâche ?")) { 
             state.tasks = state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value)); 
             window.saveState(); hideModal('modalT'); 
         } 
     };
 
-    // AUTRES
+    // GESTION DU PERSONNEL
     window.addStaff = function() { 
-        let n = document.getElementById('new_staff').value; 
-        if(n) { 
+        let n = document.getElementById('new_staff').value.trim(); 
+        if(n) {
+            if (state.staff.includes(n)) {
+                alert("Cette personne existe déjà dans la liste.");
+                return;
+            }
             state.staff.push(n); 
             state.staff.sort(); 
             window.saveState(); 
@@ -759,10 +795,51 @@
         } 
     };
 
+    // NOUVELLE FONCTION : Supprimer un membre du personnel
+    window.deleteStaff = function(staffName) {
+        // Vérifier si ce membre est affecté à des tâches
+        const tasksWithStaff = state.tasks.filter(task => task.staff && task.staff.includes(staffName));
+        
+        if (tasksWithStaff.length > 0) {
+            const taskNames = tasksWithStaff.map(t => `- ${t.name}`).join('\n');
+            const confirmMsg = `⚠️ ${staffName} est affecté(e) à ${tasksWithStaff.length} tâche(s) :\n\n${taskNames}\n\nVoulez-vous vraiment supprimer cette personne ? Elle sera retirée de toutes les tâches.`;
+            
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+            
+            // Retirer le membre de toutes les tâches
+            tasksWithStaff.forEach(task => {
+                task.staff = task.staff.filter(s => s !== staffName);
+                
+                // Si la tâche n'a plus de personnel, la supprimer aussi
+                if (task.staff.length === 0) {
+                    state.tasks = state.tasks.filter(t => t.id !== task.id);
+                }
+            });
+        } else {
+            if (!confirm(`Supprimer ${staffName} de la liste du personnel ?`)) {
+                return;
+            }
+        }
+        
+        // Supprimer le membre du personnel
+        state.staff = state.staff.filter(s => s !== staffName);
+        window.saveState();
+    };
+
     function updateSelectors() {
         document.getElementById('t_proj_sel').innerHTML = (state.projects || []).map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
         document.getElementById('t_staff_sel').innerHTML = (state.staff || []).map(s => `<option value="${s}">${s}</option>`).join('');
-        document.getElementById('staff-list').innerHTML = (state.staff || []).map(s => `<div>• ${s}</div>`).join('');
+        
+        // AMÉLIORATION : Liste du personnel avec bouton de suppression
+        document.getElementById('staff-list').innerHTML = (state.staff || []).map(s => `
+            <div class="staff-item">
+                <span>• ${s}</span>
+                <button class="btn-red btn-small" onclick="deleteStaff('${s}')">🗑️ Supprimer</button>
+            </div>
+        `).join('');
+        
         document.getElementById('print_proj_sel').innerHTML = (state.projects || []).map(p => `<option value="${p.id}">${p.aff} – ${p.cli}</option>`).join('');
         
         const today = new Date();
@@ -772,30 +849,25 @@
     window.showModal = function(id) { 
         document.getElementById(id).style.display = 'flex'; 
         
-        // Toujours mettre à jour les selects quand on ouvre un modal
         updateSelectors();
         
         if (id === 'modalT') {
             const editTaskId = document.getElementById('edit_task_id').value;
             
             if (!editTaskId) {
-                // Nouvelle tâche : réinitialiser le formulaire
                 document.getElementById('t_name').value = '';
                 document.getElementById('t_start').value = '';
                 document.getElementById('t_dur').value = 1;
                 document.getElementById('btn_del_task').style.display = 'none';
                 
-                // Sélectionner le dernier projet créé par défaut
                 if (state.projects.length > 0) {
                     const lastProject = state.projects[state.projects.length - 1];
                     document.getElementById('t_proj_sel').value = lastProject.id;
                 }
                 
-                // Désélectionner tout le personnel
                 const sel = document.getElementById('t_staff_sel');
                 Array.from(sel.options).forEach(opt => opt.selected = false);
             } else {
-                // Édition : recharger les données de la tâche après la reconstruction des selects
                 const task = state.tasks.find(t => t.id === parseInt(editTaskId));
                 if (task) {
                     document.getElementById('t_proj_sel').value = task.pId;
@@ -803,7 +875,6 @@
                     document.getElementById('t_start').value = task.start;
                     document.getElementById('t_dur').value = task.duration || 1;
                     
-                    // Re-sélectionner le personnel
                     const sel = document.getElementById('t_staff_sel');
                     Array.from(sel.options).forEach(opt => {
                         opt.selected = task.staff.includes(opt.value);
@@ -814,6 +885,7 @@
             }
         }
     };
+    
     window.hideModal = function(id) {
         document.getElementById(id).style.display = 'none';
         if(id === 'modalT') document.getElementById('edit_task_id').value = "";
@@ -825,5 +897,6 @@
 
     render();
 </script>
+
 </body>
 </html>
