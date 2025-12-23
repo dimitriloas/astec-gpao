@@ -94,7 +94,6 @@
         .checkbox-container { display: flex; align-items: center; gap: 8px; }
         .checkbox-container input[type="checkbox"] { width: auto; }
 
-        /* Liste du personnel avec bouton supprimer */
         .staff-item {
             display: flex;
             justify-content: space-between;
@@ -107,7 +106,6 @@
             background: #f8f9fa;
         }
 
-        /* Quick edit modal */
         .quick-edit-modal {
             position: absolute;
             background: white;
@@ -143,7 +141,6 @@
             font-style: italic;
         }
 
-        /* STYLES D'IMPRESSION */
         @media print {
             @page { size: A3 landscape; margin: 10mm; }
             body { margin: 0; padding: 0; background: white; }
@@ -240,7 +237,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    // --- CONFIGURATION FIREBASE ---
     const firebaseConfig = {
         apiKey: "AIzaSyAGziDYYX7R-3MV5UX3UO4xy8iwWdOkgI8",
         authDomain: "astec-gpao.firebaseapp.com",
@@ -255,7 +251,6 @@
     const db = getDatabase(app);
     const stateRef = ref(db, 'gpao_data');
 
-    // --- VARIABLES D'ÉTAT ---
     let state = { projects: [], tasks: [], staff: [] };
     let viewDate = new Date(); viewDate.setDate(1);
     let selectedTaskId = null;
@@ -263,7 +258,6 @@
     let resizeData = null;
     let quickEditModal = null;
 
-    // --- SYNCHRONISATION TEMPS RÉEL ---
     onValue(stateRef, (snapshot) => {
         const data = snapshot.val();
         if (data) {
@@ -275,7 +269,6 @@
         }
     });
 
-    // --- FONCTIONS UTILITAIRES ---
     function formatDateKey(date) {
         const d = new Date(date);
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -325,22 +318,64 @@
         return count;
     }
 
-    // NOUVELLE FONCTION : Vérifier si une tâche est dans le mois affiché
     function isTaskInMonth(task, year, month) {
         const taskStart = new Date(task.start);
         const taskEnd = new Date(task.end);
         const monthStart = new Date(year, month, 1);
         const monthEnd = new Date(year, month + 1, 0);
-        
-        // La tâche chevauche le mois si elle commence avant la fin du mois ET finit après le début du mois
         return taskStart <= monthEnd && taskEnd >= monthStart;
+    }
+
+    function isNonWorkingDay(date, feries) {
+        const day = date.getDay();
+        const dateKey = formatDateKey(date);
+        return day === 0 || day === 6 || feries[dateKey];
+    }
+
+    function getTaskSegments(task, year, month, feries) {
+        const taskStart = new Date(task.start);
+        const taskEnd = new Date(task.end);
+        const segments = [];
+        
+        let currentSegmentStart = null;
+        let current = new Date(taskStart);
+        
+        while (current <= taskEnd) {
+            const isNonWorking = isNonWorkingDay(current, feries);
+            
+            if (!isNonWorking) {
+                if (!currentSegmentStart) {
+                    currentSegmentStart = new Date(current);
+                }
+            } else {
+                if (currentSegmentStart) {
+                    const prevDay = new Date(current);
+                    prevDay.setDate(prevDay.getDate() - 1);
+                    segments.push({
+                        start: new Date(currentSegmentStart),
+                        end: prevDay
+                    });
+                    currentSegmentStart = null;
+                }
+            }
+            
+            current.setDate(current.getDate() + 1);
+        }
+        
+        if (currentSegmentStart) {
+            segments.push({
+                start: currentSegmentStart,
+                end: new Date(taskEnd)
+            });
+        }
+        
+        return segments;
     }
 
     window.saveState = function() {
         set(stateRef, state);
     };
 
-    // GESTION DE LA SÉLECTION ET INTERACTION DES TÂCHES
     function selectTask(taskId, event) {
         event.stopPropagation();
         closeQuickEditModal();
@@ -428,8 +463,7 @@
         window.saveState();
     };
 
-    // GESTION DU REDIMENSIONNEMENT
-    window.startResize = function(taskId, direction, event) {
+    window.startResize = function(taskId, direction, segmentIndex, event) {
         event.stopPropagation();
         isResizing = true;
         
@@ -437,6 +471,7 @@
         resizeData = {
             taskId: taskId,
             direction: direction,
+            segmentIndex: segmentIndex,
             startX: event.pageX,
             originalStart: new Date(task.start),
             originalEnd: new Date(task.end)
@@ -497,7 +532,6 @@
         const feries = getFeries(y);
         document.getElementById('date-display').innerText = viewDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'}).toUpperCase();
 
-        // AMÉLIORATION : Filtrer les projets qui ont des tâches dans le mois affiché
         const visibleProjects = state.projects.filter(p => {
             const projectTasks = state.tasks.filter(t => t.pId === p.id);
             return projectTasks.some(task => isTaskInMonth(task, y, m));
@@ -524,7 +558,6 @@
 
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
 
-        // AMÉLIORATION : Afficher uniquement les projets avec des tâches dans le mois
         if (visibleProjects.length === 0) {
             html += `<tr><td colspan="${daysInM + 1}" class="no-tasks-message">Aucune tâche prévue ce mois-ci</td></tr>`;
         } else {
@@ -538,22 +571,37 @@
 
                 state.tasks.filter(t => t.pId === p.id && isTaskInMonth(t, y, m)).forEach(t => {
                     html += `<tr><td class="col-fixed" style="padding-left:30px;"><span class="task-name" onclick="editTask(${t.id})">${t.name}</span></td>`;
-                    let sD = new Date(t.start), eD = new Date(t.end);
+                    
+                    const segments = getTaskSegments(t, y, m, feries);
+                    
                     for(let d=1; d<=daysInM; d++) {
                         let cur = new Date(y, m, d), ds = formatDateKey(cur), content = "";
-                        if (cur.toDateString() === sD.toDateString()) {
-                            let diff = Math.ceil((eD - sD) / (1000 * 60 * 60 * 24)) + 1;
-                            let width = Math.min(diff, daysInM - d + 1) * 50;
-                            const isSelected = selectedTaskId === t.id ? 'selected' : '';
-                            content = `<div class="task-bar ${isSelected}" 
-                                            style="background:${p.color}; width:${width-4}px;" 
-                                            onclick="selectTask(${t.id}, event)"
-                                            ondblclick="onTaskDoubleClick(${t.id}, event)">
-                                            <div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', event)"></div>
-                                            ${(t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('')}
-                                            <div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', event)"></div>
-                                       </div>`;
-                        }
+                        
+                        segments.forEach((segment, segmentIndex) => {
+                            if (cur.toDateString() === segment.start.toDateString()) {
+                                let segmentDays = 0;
+                                let tempDate = new Date(segment.start);
+                                while (tempDate <= segment.end && tempDate.getMonth() === m) {
+                                    segmentDays++;
+                                    tempDate.setDate(tempDate.getDate() + 1);
+                                }
+                                
+                                const width = segmentDays * 50;
+                                const isSelected = selectedTaskId === t.id ? 'selected' : '';
+                                const isFirstSegment = segmentIndex === 0;
+                                const isLastSegment = segmentIndex === segments.length - 1;
+                                
+                                content = `<div class="task-bar ${isSelected}" 
+                                                style="background:${p.color}; width:${width-4}px;" 
+                                                onclick="selectTask(${t.id}, event)"
+                                                ondblclick="onTaskDoubleClick(${t.id}, event)">
+                                                ${isFirstSegment ? `<div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', ${segmentIndex}, event)"></div>` : ''}
+                                                ${(t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('')}
+                                                ${isLastSegment ? `<div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', ${segmentIndex}, event)"></div>` : ''}
+                                           </div>`;
+                            }
+                        });
+                        
                         html += `<td class="col-day task-bar-cell ${cur.getDay()===0||cur.getDay()===6?'weekend':''} ${feries[ds]?'ferie':''} ${cur.getDay()===1?'sep-lundi':''}">${content}</td>`;
                     }
                     html += `</tr>`;
@@ -563,7 +611,6 @@
         document.getElementById('gantt-table').innerHTML = html + `</tbody></table>`;
     };
 
-    // Désélectionner quand on clique en dehors
     document.addEventListener('click', () => {
         if (!isResizing) {
             selectedTaskId = null;
@@ -571,7 +618,6 @@
         }
     });
 
-    // FONCTION IMPRESSION PDF
     window.printPDF = function() {
         const projId = parseInt(document.getElementById('print_proj_sel').value);
         const startDate = new Date(document.getElementById('print_start_date').value);
@@ -668,16 +714,29 @@
         } else {
             projectTasks.forEach(t => {
                 html += `<tr><td class="col-fixed" style="padding-left:30px;">${t.name}</td>`;
-                let sD = new Date(t.start), eD = new Date(t.end);
+                
+                const segments = getTaskSegments(t, startDate.getFullYear(), startDate.getMonth(), feries);
                 
                 days.forEach((cur, idx) => {
                     let ds = formatDateKey(cur), content = "";
-                    if (cur.toDateString() === sD.toDateString()) {
-                        let diff = Math.ceil((eD - sD) / (1000 * 60 * 60 * 24)) + 1;
-                        let width = Math.min(diff, days.length - idx) * 40;
-                        let staffHTML = showStaff ? (t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('') : '';
-                        content = `<div class="task-bar" style="background:${project.color}; width:${width-4}px;">${staffHTML}</div>`;
-                    }
+                    
+                    segments.forEach(segment => {
+                        if (cur.toDateString() === segment.start.toDateString()) {
+                            let segmentDays = 0;
+                            let tempDate = new Date(segment.start);
+                            while (tempDate <= segment.end && tempDate <= endDate) {
+                                if (days.some(d => d.toDateString() === tempDate.toDateString())) {
+                                    segmentDays++;
+                                }
+                                tempDate.setDate(tempDate.getDate() + 1);
+                            }
+                            
+                            const width = segmentDays * 40;
+                            let staffHTML = showStaff ? (t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('') : '';
+                            content = `<div class="task-bar" style="background:${project.color}; width:${width-4}px;">${staffHTML}</div>`;
+                        }
+                    });
+                    
                     html += `<td class="col-day task-bar-cell ${cur.getDay()===0||cur.getDay()===6?'weekend':''} ${feries[ds]?'ferie':''} ${cur.getDay()===1?'sep-lundi':''}">${content}</td>`;
                 });
                 html += `</tr>`;
@@ -687,7 +746,6 @@
         return html + `</tbody></table>`;
     }
 
-    // GESTION PROJET
     window.openModalP = function(id = null) {
         const modal = document.getElementById('modalP');
         const title = document.getElementById('modalP_title');
@@ -747,7 +805,6 @@
         }
     };
 
-    // GESTION TACHES
     window.editTask = function(id) {
         document.getElementById('edit_task_id').value = id;
         showModal('modalT');
@@ -780,7 +837,6 @@
         } 
     };
 
-    // GESTION DU PERSONNEL
     window.addStaff = function() { 
         let n = document.getElementById('new_staff').value.trim(); 
         if(n) {
@@ -795,9 +851,7 @@
         } 
     };
 
-    // NOUVELLE FONCTION : Supprimer un membre du personnel
     window.deleteStaff = function(staffName) {
-        // Vérifier si ce membre est affecté à des tâches
         const tasksWithStaff = state.tasks.filter(task => task.staff && task.staff.includes(staffName));
         
         if (tasksWithStaff.length > 0) {
@@ -808,11 +862,9 @@
                 return;
             }
             
-            // Retirer le membre de toutes les tâches
             tasksWithStaff.forEach(task => {
                 task.staff = task.staff.filter(s => s !== staffName);
                 
-                // Si la tâche n'a plus de personnel, la supprimer aussi
                 if (task.staff.length === 0) {
                     state.tasks = state.tasks.filter(t => t.id !== task.id);
                 }
@@ -823,7 +875,6 @@
             }
         }
         
-        // Supprimer le membre du personnel
         state.staff = state.staff.filter(s => s !== staffName);
         window.saveState();
     };
@@ -832,7 +883,6 @@
         document.getElementById('t_proj_sel').innerHTML = (state.projects || []).map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
         document.getElementById('t_staff_sel').innerHTML = (state.staff || []).map(s => `<option value="${s}">${s}</option>`).join('');
         
-        // AMÉLIORATION : Liste du personnel avec bouton de suppression
         document.getElementById('staff-list').innerHTML = (state.staff || []).map(s => `
             <div class="staff-item">
                 <span>• ${s}</span>
