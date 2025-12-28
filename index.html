@@ -122,6 +122,36 @@
             margin: 0;
         }
 
+        .staff-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .staff-item:hover {
+            background: #f8f9fa;
+        }
+
+        .staff-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            border: none;
+            border-radius: 3px;
+            color: white;
+            font-weight: 600;
+        }
+
+        .btn-edit { background: #3498db; }
+        .btn-delete { background: #e74c3c; }
+
         /* STYLES D'IMPRESSION */
         @media print {
             @page { size: A3 landscape; margin: 10mm; }
@@ -193,10 +223,10 @@
 
 <div id="modalPerso" class="modal"><div class="modal-content">
     <h3>Gestion Personnel</h3>
-    <div id="staff-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; padding: 10px; margin-bottom:10px;"></div>
+    <div id="staff-list" style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; margin-bottom:10px;"></div>
     <input type="text" id="new_staff" placeholder="Nom Prénom">
     <button class="btn-green" onclick="addStaff()">Ajouter</button>
-    <button class="btn-red" onclick="hideModal('modalPerso')">Fermer</button>
+    <button class="btn-grey" onclick="hideModal('modalPerso')">Fermer</button>
 </div></div>
 
 <div id="modalPrint" class="modal"><div class="modal-content">
