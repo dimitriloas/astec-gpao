@@ -75,15 +75,16 @@
             border-radius: 8px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             z-index: 200; min-width: 250px;
         }
+        .quick-edit-modal h4 { margin: 0 0 10px 0; color: var(--primary); }
+        .staff-checkbox { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
 
-        /* Styles corrigés pour la liste du personnel */
         .staff-item {
             display: flex; align-items: center; justify-content: space-between;
             padding: 8px; border-bottom: 1px solid #eee;
         }
         .staff-item:hover { background: #f8f9fa; }
         .staff-actions { display: flex; gap: 5px; }
-        .btn-small { padding: 4px 8px; font-size: 11px; }
+        .btn-small { padding: 4px 8px; font-size: 11px; cursor: pointer; border: none; border-radius: 3px; color: white; font-weight: 600; }
         .btn-edit { background: #3498db; }
         .btn-delete { background: #e74c3c; }
 
@@ -226,7 +227,108 @@
         return count;
     }
 
-    // GESTION PERSONNEL (CORRIGÉE)
+    // INTERACTION TACHES (CORRIGÉ)
+    function selectTask(taskId, event) {
+        event.stopPropagation();
+        closeQuickEditModal();
+        selectedTaskId = (selectedTaskId === taskId) ? null : taskId;
+        render();
+    }
+
+    function onTaskDoubleClick(taskId, event) {
+        event.stopPropagation();
+        selectedTaskId = taskId;
+        showQuickEditModal(taskId, event);
+    }
+
+    function showQuickEditModal(taskId, event) {
+        closeQuickEditModal();
+        const task = state.tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const modal = document.createElement('div');
+        modal.className = 'quick-edit-modal';
+        modal.style.left = event.pageX + 'px';
+        modal.style.top = event.pageY + 'px';
+
+        let html = `<h4>👥 Personnel affecté</h4>`;
+        state.staff.forEach(s => {
+            const checked = task.staff.includes(s) ? 'checked' : '';
+            html += `
+                <div class="staff-checkbox">
+                    <input type="checkbox" id="quick_${s}" value="${s}" ${checked} 
+                           onchange="updateTaskStaff(${taskId}, this.value, this.checked)">
+                    <label for="quick_${s}">${s}</label>
+                </div>
+            `;
+        });
+        html += `<button class="btn-grey" style="margin-top:10px; width:100%;" onclick="closeQuickEditModal()">Fermer</button>`;
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+        quickEditModal = modal;
+        setTimeout(() => document.addEventListener('click', closeQuickEditModalOnOutsideClick), 100);
+    }
+
+    function updateTaskStaff(taskId, staffName, isChecked) {
+        const task = state.tasks.find(t => t.id === taskId);
+        if (!task) return;
+        if (isChecked) { if (!task.staff.includes(staffName)) task.staff.push(staffName); }
+        else { task.staff = task.staff.filter(s => s !== staffName); }
+        if (task.staff.length === 0) {
+            alert("Au moins une personne requise");
+            task.staff.push(staffName);
+            document.getElementById(`quick_${staffName}`).checked = true;
+            return;
+        }
+        saveState();
+    }
+
+    function closeQuickEditModal() {
+        if (quickEditModal) { quickEditModal.remove(); quickEditModal = null; document.removeEventListener('click', closeQuickEditModalOnOutsideClick); }
+    }
+    function closeQuickEditModalOnOutsideClick(e) { if (quickEditModal && !quickEditModal.contains(e.target)) closeQuickEditModal(); }
+
+    // REDIMENSIONNEMENT (CORRIGÉ)
+    function startResize(taskId, direction, event) {
+        event.stopPropagation();
+        isResizing = true;
+        const task = state.tasks.find(t => t.id === taskId);
+        resizeData = { taskId, direction, startX: event.pageX, originalStart: new Date(task.start), originalEnd: new Date(task.end) };
+        document.addEventListener('mousemove', handleResize);
+        document.addEventListener('mouseup', endResize);
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+    }
+
+    function handleResize(event) {
+        if (!isResizing || !resizeData) return;
+        const deltaX = event.pageX - resizeData.startX;
+        const daysDelta = Math.round(deltaX / 50);
+        if (daysDelta === 0) return;
+
+        const task = state.tasks.find(t => t.id === resizeData.taskId);
+        let newStart = new Date(resizeData.originalStart);
+        let newEnd = new Date(resizeData.originalEnd);
+
+        if (resizeData.direction === 'left') {
+            newStart.setDate(newStart.getDate() + daysDelta);
+            if (newStart >= newEnd) return;
+        } else {
+            newEnd.setDate(newEnd.getDate() + daysDelta);
+            if (newEnd <= newStart) return;
+        }
+
+        task.start = formatDateKey(newStart);
+        task.end = formatDateKey(newEnd);
+        task.duration = countBusinessDays(newStart, newEnd);
+        render();
+    }
+
+    function endResize() {
+        if (isResizing) { isResizing = false; resizeData = null; document.removeEventListener('mousemove', handleResize); document.removeEventListener('mouseup', endResize); document.body.style.cursor = ''; document.body.style.userSelect = ''; saveState(); }
+    }
+
+    // GESTION PERSONNEL
     function addStaff() { 
         let n = document.getElementById('new_staff').value.trim(); 
         if(n && !state.staff.includes(n)) { 
@@ -239,21 +341,15 @@
         let newName = prompt("Nouveau nom pour " + oldName + " :", oldName);
         if (newName && newName.trim() !== "" && newName !== oldName) {
             newName = newName.trim();
-            // Maj liste globale
             const idx = state.staff.indexOf(oldName);
             if (idx !== -1) state.staff[idx] = newName;
-            // Maj dans les tâches
-            state.tasks.forEach(t => {
-                if (t.staff && t.staff.includes(oldName)) {
-                    t.staff = t.staff.map(s => s === oldName ? newName : s);
-                }
-            });
+            state.tasks.forEach(t => { if (t.staff && t.staff.includes(oldName)) t.staff = t.staff.map(s => s === oldName ? newName : s); });
             state.staff.sort(); saveState(); updateSelectors();
         }
     }
 
     function removeStaffFromList(name) {
-        if (confirm(`Retirer "${name}" de la liste ? (Il restera affecté aux tâches actuelles).`)) {
+        if (confirm(`Retirer "${name}" de la liste ? (Il restera sur les tâches actuelles).`)) {
             state.staff = state.staff.filter(s => s !== name);
             saveState(); updateSelectors();
         }
@@ -263,8 +359,6 @@
         document.getElementById('t_proj_sel').innerHTML = state.projects.map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
         document.getElementById('t_staff_sel').innerHTML = state.staff.map(s => `<option value="${s}">${s}</option>`).join('');
         document.getElementById('print_proj_sel').innerHTML = state.projects.map(p => `<option value="${p.id}">${p.aff} – ${p.cli}</option>`).join('');
-        
-        // Affichage avec boutons Modifier/Supprimer
         document.getElementById('staff-list').innerHTML = state.staff.map(s => `
             <div class="staff-item">
                 <span>${s}</span>
@@ -276,7 +370,7 @@
         `).join('');
     }
 
-    // ACTIONS TACHES & PROJETS
+    // ACTIONS PROJETS / TACHES
     function openModalP(id = null) {
         const p = id ? state.projects.find(x => x.id === id) : null;
         document.getElementById('modalP_title').innerText = id ? "Modifier Projet" : "Nouveau Projet";
@@ -293,12 +387,8 @@
     function saveProject() {
         const id = document.getElementById('edit_proj_id').value;
         const data = { aff: document.getElementById('p_aff').value, cli: document.getElementById('p_cli').value, nature: document.getElementById('p_nature').value, lie: document.getElementById('p_lie').value };
-        if(id) {
-            let idx = state.projects.findIndex(x => x.id === parseInt(id));
-            state.projects[idx] = { ...state.projects[idx], ...data };
-        } else {
-            state.projects.push({ id: Date.now(), ...data, color: `hsl(${Math.random()*360}, 65%, 45%)` });
-        }
+        if(id) { let idx = state.projects.findIndex(x => x.id === parseInt(id)); state.projects[idx] = { ...state.projects[idx], ...data }; }
+        else { state.projects.push({ id: Date.now(), ...data, color: `hsl(${Math.random()*360}, 65%, 45%)` }); }
         saveState(); hideModal('modalP');
     }
 
@@ -318,8 +408,7 @@
         document.getElementById('t_start').value = formatDateKey(new Date());
         document.getElementById('t_dur').value = "1";
         document.getElementById('btn_del_task').style.display = "none";
-        updateSelectors();
-        showModal('modalT');
+        updateSelectors(); showModal('modalT');
     }
 
     function editTask(id) {
@@ -345,7 +434,7 @@
             id: id ? parseInt(id) : Date.now(),
             pId: parseInt(document.getElementById('t_proj_sel').value),
             name: document.getElementById('t_name').value || "Tâche",
-            staff: staff, start: document.getElementById('t_start').value,
+            staff, start: document.getElementById('t_start').value,
             duration: parseInt(document.getElementById('t_dur').value),
             end: addBusinessDays(new Date(document.getElementById('t_start').value), parseInt(document.getElementById('t_dur').value))
         };
@@ -361,7 +450,7 @@
         }
     }
 
-    // RENDU GANTT
+    // RENDU (AVEC FIX CLIC/DBLCLIC)
     function render() {
         const y = viewDate.getFullYear(), m = viewDate.getMonth(), daysInM = new Date(y, m + 1, 0).getDate(), feries = getFeries(y);
         document.getElementById('date-display').innerText = viewDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'}).toUpperCase();
@@ -374,16 +463,12 @@
         for(let d=1; d<=daysInM; d++) {
             let dt = new Date(y, m, d), ds = formatDateKey(dt), isFerie = feries[ds], isWeekend = (dt.getDay()===0||dt.getDay()===6);
             weekSpan++;
-            if (dt.getDay() === 0 || d === daysInM) {
-                rowWeeks += `<th colspan="${weekSpan}" style="background:#f8f9fa; font-size:0.75em; border-bottom: 2px solid var(--accent);">Sem. ${getWeekNumber(dt)}</th>`;
-                weekSpan = 0;
-            }
+            if (dt.getDay() === 0 || d === daysInM) { rowWeeks += `<th colspan="${weekSpan}" style="background:#f8f9fa; font-size:0.75em; border-bottom: 2px solid var(--accent);">Sem. ${getWeekNumber(dt)}</th>`; weekSpan = 0; }
             rowFerieNames += `<th class="col-day ${isFerie ? 'ferie' : ''}">${isFerie ? `<div class="ferie-header-name">${isFerie}</div>` : ''}</th>`;
             rowDays += `<th class="col-day ${isWeekend ? 'weekend' : ''} ${isFerie ? 'ferie' : ''}"><div style="font-size:0.8em;">${dt.toLocaleDateString('fr-FR', {weekday:'short'}).replace('.','')}</div><div>${d}</div></th>`;
         }
 
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
-
         state.projects.forEach(p => {
             html += `<tr class="row-p"><td class="col-fixed"><span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} – ${p.cli}</b></span> | ${p.lie}</td><td colspan="${daysInM}"></td></tr>`;
             state.tasks.filter(t => t.pId === p.id).forEach(t => {
@@ -394,7 +479,15 @@
                     if (cur.toDateString() === sD.toDateString()) {
                         let diff = Math.ceil((eD - sD) / 86400000) + 1;
                         let width = Math.min(diff, daysInM - d + 1) * 50;
-                        content = `<div class="task-bar" style="background:${p.color}; width:${width-4}px;">${(t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('')}</div>`;
+                        const isSelected = selectedTaskId === t.id ? 'selected' : '';
+                        content = `<div class="task-bar ${isSelected}" 
+                                        style="background:${p.color}; width:${width-4}px;" 
+                                        onclick="selectTask(${t.id}, event)"
+                                        ondblclick="onTaskDoubleClick(${t.id}, event)">
+                                        <div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', event)"></div>
+                                        ${(t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('')}
+                                        <div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', event)"></div>
+                                   </div>`;
                     }
                     html += `<td class="col-day ${cur.getDay()===0||cur.getDay()===6?'weekend':''}">${content}</td>`;
                 }
@@ -404,6 +497,7 @@
         document.getElementById('gantt-table').innerHTML = html + `</tbody></table>`;
     }
 
+    document.addEventListener('click', () => { if (!isResizing) { selectedTaskId = null; render(); } });
     function showModal(id) { document.getElementById(id).style.display = 'flex'; if(id==='modalPerso') updateSelectors(); }
     function hideModal(id) { document.getElementById(id).style.display = 'none'; }
     function changeMonth(n) { viewDate.setMonth(viewDate.getMonth() + n); render(); }
