@@ -151,7 +151,7 @@
         <div id="date-display">...</div>
         <button class="btn-blue" onclick="changeMonth(1)">Suivant ▶</button>
         <button class="btn-green" onclick="openModalP()">+ Projet</button>
-        <button class="btn-blue" onclick="showModal('modalT')">+ Tâche</button>
+        <button class="btn-blue" onclick="newTask()">+ Tâche</button>
         <button style="background: #9b59b6;" onclick="showModal('modalPerso')">👥 Personnel</button>
         <button class="btn-orange" onclick="showModal('modalPrint')">🖨️ Imprimer PDF</button>
     </div>
@@ -176,17 +176,17 @@
 </div></div>
 
 <div id="modalT" class="modal"><div class="modal-content">
-    <h3>Détail Tâche</h3>
+    <h3 id="modalT_title">Nouvelle Tâche</h3>
     <input type="hidden" id="edit_task_id">
     <select id="t_proj_sel"></select>
     <input type="text" id="t_name" placeholder="Désignation">
-    <label>Personnel :</label>
-    <select id="t_staff_sel" multiple style="height: 100px;"></select>
+    <label>Personnel (maintenir Ctrl pour sélection multiple) :</label>
+    <select id="t_staff_sel" multiple style="height: 120px; padding: 5px;"></select>
     <label>Début :</label><input type="date" id="t_start">
     <label>Durée (jours ouvrés) :</label><input type="number" id="t_dur" value="1" min="1">
     <div style="display:flex; gap:10px;">
         <button class="btn-blue" style="flex:1" onclick="saveTask()">Enregistrer</button>
-        <button id="btn_del_task" class="btn-red" onclick="delTask()">Supprimer</button>
+        <button id="btn_del_task" class="btn-red" style="display:none" onclick="delTask()">Supprimer</button>
     </div>
     <button class="btn-grey" onclick="hideModal('modalT')">Annuler</button>
 </div></div>
@@ -277,11 +277,9 @@
     function selectTask(taskId, event) {
         event.stopPropagation();
         
-        // Fermer le modal d'édition rapide s'il existe
         closeQuickEditModal();
 
         if (selectedTaskId === taskId) {
-            // Déselectionner si déjà sélectionné
             selectedTaskId = null;
         } else {
             selectedTaskId = taskId;
@@ -323,7 +321,6 @@
         document.body.appendChild(modal);
         quickEditModal = modal;
 
-        // Fermer si clic à l'extérieur
         setTimeout(() => {
             document.addEventListener('click', closeQuickEditModalOnOutsideClick);
         }, 100);
@@ -355,7 +352,6 @@
             task.staff = task.staff.filter(s => s !== staffName);
         }
 
-        // Au moins une personne doit être affectée
         if (task.staff.length === 0) {
             alert("Au moins une personne doit être affectée à la tâche.");
             task.staff.push(staffName);
@@ -390,7 +386,7 @@
         if (!isResizing || !resizeData) return;
 
         const deltaX = event.pageX - resizeData.startX;
-        const daysDelta = Math.round(deltaX / 50); // 50px par jour
+        const daysDelta = Math.round(deltaX / 50);
 
         if (daysDelta === 0) return;
 
@@ -401,18 +397,13 @@
         let newEnd = new Date(resizeData.originalEnd);
 
         if (resizeData.direction === 'left') {
-            // Déplacer le début
             newStart.setDate(newStart.getDate() + daysDelta);
-            // Ne pas dépasser la fin
             if (newStart >= newEnd) return;
         } else {
-            // Déplacer la fin
             newEnd.setDate(newEnd.getDate() + daysDelta);
-            // Ne pas passer avant le début
             if (newEnd <= newStart) return;
         }
 
-        // Recalculer la durée en jours ouvrés
         const duration = countBusinessDays(newStart, newEnd);
         
         task.start = formatDateKey(newStart);
@@ -493,10 +484,8 @@
             });
         });
         document.getElementById('gantt-table').innerHTML = html + `</tbody></table>`;
-        updateSelectors();
     }
 
-    // Déselectionner quand on clique en dehors
     document.addEventListener('click', () => {
         if (!isResizing) {
             selectedTaskId = null;
@@ -662,16 +651,50 @@
     }
 
     // GESTION TACHES
+    function newTask() {
+        const title = document.getElementById('modalT_title');
+        const btnDel = document.getElementById('btn_del_task');
+        
+        title.innerText = "Nouvelle Tâche";
+        document.getElementById('edit_task_id').value = "";
+        document.getElementById('t_name').value = "";
+        document.getElementById('t_start').value = formatDateKey(new Date());
+        document.getElementById('t_dur').value = "1";
+        btnDel.style.display = "none";
+        
+        updateSelectors();
+        
+        const sel = document.getElementById('t_staff_sel');
+        Array.from(sel.options).forEach(opt => opt.selected = false);
+        
+        if (state.projects.length > 0) {
+            document.getElementById('t_proj_sel').value = state.projects[0].id;
+        }
+        
+        showModal('modalT');
+    }
+
     function editTask(id) {
         const t = state.tasks.find(x => x.id === id);
+        const title = document.getElementById('modalT_title');
+        const btnDel = document.getElementById('btn_del_task');
+        
+        title.innerText = "Modifier Tâche";
         document.getElementById('edit_task_id').value = t.id;
-        document.getElementById('t_proj_sel').value = t.pId;
         document.getElementById('t_name').value = t.name;
         document.getElementById('t_start').value = t.start;
         document.getElementById('t_dur').value = t.duration || 1;
+        btnDel.style.display = "block";
+        
+        updateSelectors();
+        
+        document.getElementById('t_proj_sel').value = t.pId;
+        
         const sel = document.getElementById('t_staff_sel');
-        Array.from(sel.options).forEach(opt => opt.selected = t.staff.includes(opt.value));
-        document.getElementById('btn_del_task').style.display = "block";
+        Array.from(sel.options).forEach(opt => {
+            opt.selected = t.staff.includes(opt.value);
+        });
+        
         showModal('modalT');
     }
 
@@ -680,25 +703,53 @@
         const start = document.getElementById('t_start').value;
         const dur = parseInt(document.getElementById('t_dur').value);
         const staff = Array.from(document.getElementById('t_staff_sel').selectedOptions).map(o => o.value);
-        if(!start || staff.length === 0) return alert("Veuillez remplir la date et le personnel.");
+        
+        if(!start || staff.length === 0) {
+            alert("Veuillez remplir la date de début et sélectionner au moins une personne.");
+            return;
+        }
 
         const taskData = {
             id: id ? parseInt(id) : Date.now(),
             pId: parseInt(document.getElementById('t_proj_sel').value),
-            name: document.getElementById('t_name').value,
-            staff: staff, start: start,
+            name: document.getElementById('t_name').value || "Tâche sans nom",
+            staff: staff, 
+            start: start,
             end: addBusinessDays(new Date(start), dur),
             duration: dur
         };
-        if(id) { state.tasks[state.tasks.findIndex(x => x.id === parseInt(id))] = taskData; }
-        else { state.tasks.push(taskData); }
-        saveState(); hideModal('modalT');
+        
+        if(id) { 
+            state.tasks[state.tasks.findIndex(x => x.id === parseInt(id))] = taskData; 
+        } else { 
+            state.tasks.push(taskData); 
+        }
+        
+        saveState(); 
+        hideModal('modalT');
     }
 
-    function delTask() { if(confirm("Supprimer ?")) { state.tasks = state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value)); saveState(); hideModal('modalT'); } }
+    function delTask() { 
+        if(confirm("Supprimer cette tâche ?")) { 
+            state.tasks = state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value)); 
+            saveState(); 
+            hideModal('modalT'); 
+        } 
+    }
 
     // AUTRES
-    function addStaff() { let n = document.getElementById('new_staff').value; if(n) { state.staff.push(n); state.staff.sort(); saveState(); document.getElementById('new_staff').value=''; } }
+    function addStaff() { 
+        let n = document.getElementById('new_staff').value.trim(); 
+        if(n && !state.staff.includes(n)) { 
+            state.staff.push(n); 
+            state.staff.sort(); 
+            saveState(); 
+            document.getElementById('new_staff').value=''; 
+        } else if(state.staff.includes(n)) {
+            alert("Cette personne existe déjà !");
+        }
+    }
+    
     function updateSelectors() {
         document.getElementById('t_proj_sel').innerHTML = state.projects.map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
         document.getElementById('t_staff_sel').innerHTML = state.staff.map(s => `<option value="${s}">${s}</option>`).join('');
@@ -708,12 +759,25 @@
         const today = new Date();
         document.getElementById('print_start_date').value = formatDateKey(today);
     }
-    function showModal(id) { document.getElementById(id).style.display = 'flex'; updateSelectors(); }
+    
+    function showModal(id) { 
+        document.getElementById(id).style.display = 'flex'; 
+        if(id === 'modalPerso' || id === 'modalPrint') {
+            updateSelectors();
+        }
+    }
+    
     function hideModal(id) {
         document.getElementById(id).style.display = 'none';
-        if(id === 'modalT') document.getElementById('edit_task_id').value = "";
+        if(id === 'modalT') {
+            document.getElementById('edit_task_id').value = "";
+        }
     }
-    function changeMonth(n) { viewDate.setMonth(viewDate.getMonth() + n); render(); }
+    
+    function changeMonth(n) { 
+        viewDate.setMonth(viewDate.getMonth() + n); 
+        render(); 
+    }
 
     render();
 </script>
