@@ -227,7 +227,13 @@
         return count;
     }
 
-    // INTERACTION TACHES (CORRIGÉ)
+    function isWorkingDay(date, feries) {
+        const day = date.getDay();
+        const key = formatDateKey(date);
+        return day !== 0 && day !== 6 && !feries[key];
+    }
+
+    // INTERACTION TACHES
     function selectTask(taskId, event) {
         event.stopPropagation();
         closeQuickEditModal();
@@ -288,7 +294,7 @@
     }
     function closeQuickEditModalOnOutsideClick(e) { if (quickEditModal && !quickEditModal.contains(e.target)) closeQuickEditModal(); }
 
-    // REDIMENSIONNEMENT (CORRIGÉ)
+    // REDIMENSIONNEMENT
     function startResize(taskId, direction, event) {
         event.stopPropagation();
         isResizing = true;
@@ -358,7 +364,7 @@
     function updateSelectors() {
         document.getElementById('t_proj_sel').innerHTML = state.projects.map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
         document.getElementById('t_staff_sel').innerHTML = state.staff.map(s => `<option value="${s}">${s}</option>`).join('');
-        document.getElementById('print_proj_sel').innerHTML = state.projects.map(p => `<option value="${p.id}">${p.aff} – ${p.cli}</option>`).join('');
+        document.getElementById('print_proj_sel').innerHTML = state.projects.map(p => `<option value="${p.id}">${p.aff} — ${p.cli}</option>`).join('');
         document.getElementById('staff-list').innerHTML = state.staff.map(s => `
             <div class="staff-item">
                 <span>${s}</span>
@@ -450,7 +456,7 @@
         }
     }
 
-    // RENDU (AVEC FIX CLIC/DBLCLIC)
+    // RENDU AVEC BARRES SEGMENTEES
     function render() {
         const y = viewDate.getFullYear(), m = viewDate.getMonth(), daysInM = new Date(y, m + 1, 0).getDate(), feries = getFeries(y);
         document.getElementById('date-display').innerText = viewDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'}).toUpperCase();
@@ -470,25 +476,68 @@
 
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
         state.projects.forEach(p => {
-            html += `<tr class="row-p"><td class="col-fixed"><span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} – ${p.cli}</b></span> | ${p.lie}</td><td colspan="${daysInM}"></td></tr>`;
+            html += `<tr class="row-p"><td class="col-fixed"><span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} — ${p.cli}</b></span> | ${p.lie}</td><td colspan="${daysInM}"></td></tr>`;
             state.tasks.filter(t => t.pId === p.id).forEach(t => {
                 html += `<tr><td class="col-fixed" style="padding-left:30px;"><span class="task-name" onclick="editTask(${t.id})">${t.name}</span></td>`;
+                
                 let sD = new Date(t.start), eD = new Date(t.end);
-                for(let d=1; d<=daysInM; d++) {
-                    let cur = new Date(y, m, d), content = "";
-                    if (cur.toDateString() === sD.toDateString()) {
-                        let diff = Math.ceil((eD - sD) / 86400000) + 1;
-                        let width = Math.min(diff, daysInM - d + 1) * 50;
-                        const isSelected = selectedTaskId === t.id ? 'selected' : '';
-                        content = `<div class="task-bar ${isSelected}" 
-                                        style="background:${p.color}; width:${width-4}px;" 
-                                        onclick="selectTask(${t.id}, event)"
-                                        ondblclick="onTaskDoubleClick(${t.id}, event)">
-                                        <div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', event)"></div>
-                                        ${(t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('')}
-                                        <div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', event)"></div>
-                                   </div>`;
+                
+                // Créer un tableau pour tracker les segments de barre
+                let segments = [];
+                let currentSegment = null;
+                
+                // Parcourir chaque jour de la tâche
+                let current = new Date(sD);
+                while (current <= eD) {
+                    const isWorking = isWorkingDay(current, feries);
+                    
+                    if (isWorking) {
+                        if (!currentSegment) {
+                            currentSegment = { start: new Date(current), end: new Date(current) };
+                        } else {
+                            currentSegment.end = new Date(current);
+                        }
+                    } else {
+                        if (currentSegment) {
+                            segments.push(currentSegment);
+                            currentSegment = null;
+                        }
                     }
+                    current.setDate(current.getDate() + 1);
+                }
+                
+                // Ajouter le dernier segment s'il existe
+                if (currentSegment) {
+                    segments.push(currentSegment);
+                }
+                
+                // Rendre les cellules
+                for(let d=1; d<=daysInM; d++) {
+                    let cur = new Date(y, m, d);
+                    let content = "";
+                    
+                    // Vérifier si ce jour correspond au début d'un segment
+                    segments.forEach((seg, segIndex) => {
+                        if (cur.toDateString() === seg.start.toDateString()) {
+                            // Calculer la largeur du segment
+                            let segmentDays = Math.ceil((seg.end - seg.start) / 86400000) + 1;
+                            let width = segmentDays * 50;
+                            
+                            const isSelected = selectedTaskId === t.id ? 'selected' : '';
+                            const isFirstSegment = segIndex === 0;
+                            const isLastSegment = segIndex === segments.length - 1;
+                            
+                            content = `<div class="task-bar ${isSelected}" 
+                                            style="background:${p.color}; width:${width-4}px;" 
+                                            onclick="selectTask(${t.id}, event)"
+                                            ondblclick="onTaskDoubleClick(${t.id}, event)">
+                                            ${isFirstSegment ? `<div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', event)"></div>` : ''}
+                                            ${isFirstSegment ? (t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('') : ''}
+                                            ${isLastSegment ? `<div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', event)"></div>` : ''}
+                                       </div>`;
+                        }
+                    });
+                    
                     html += `<td class="col-day ${cur.getDay()===0||cur.getDay()===6?'weekend':''}">${content}</td>`;
                 }
                 html += `</tr>`;
