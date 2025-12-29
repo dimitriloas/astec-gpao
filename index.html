@@ -169,9 +169,46 @@
     <button class="btn-grey" onclick="hideModal('modalPrint')">Annuler</button>
 </div></div>
 
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    // REMPLACER PAR VOTRE CONFIGURATION FIREBASE ICI
+    const firebaseConfig = {
+        apiKey: "AIzaSyAGziDYYX7R-3MV5UX3UO4xy8iwWdOkgI8",
+        authDomain: "astec-gpao.firebaseapp.com",
+        databaseURL: "https://astec-gpao-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "astec-gpao",
+        storageBucket: "astec-gpao.firebasestorage.app",
+        messagingSenderId: "1042124006828",
+        appId: "1:1042124006828:web:4ea7c467137cf4886b4609"
+};
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const dbRef = ref(db, 'astec_gpao_data');
+
+    // Écoute en temps réel des changements dans Firebase
+    onValue(dbRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            window.state = data;
+            if (!window.state.projects) window.state.projects = [];
+            if (!window.state.tasks) window.state.tasks = [];
+            if (!window.state.staff) window.state.staff = [];
+            render(); // Redessine le planning avec les nouvelles données
+        }
+    });
+
+    // Fonction globale pour sauvegarder vers Firebase
+    window.saveToFirebase = function() {
+        set(dbRef, window.state);
+    };
+</script>
+
 <script>
-    const DB_NAME = 'astec_v2026_fixed';
-    let state = JSON.parse(localStorage.getItem(DB_NAME)) || { projects: [], tasks: [], staff: [] };
+    // Initialisation de l'état (vide au départ, Firebase remplira les données)
+    window.state = { projects: [], tasks: [], staff: [] };
     let viewDate = new Date(); viewDate.setDate(1);
     let selectedTaskId = null;
     let isResizing = false;
@@ -200,7 +237,12 @@
         };
     }
 
-    function saveState() { localStorage.setItem(DB_NAME, JSON.stringify(state)); render(); }
+    // NOUVELLE FONCTION DE SAUVEGARDE (Firebase au lieu de LocalStorage)
+    function saveState() {
+        if (window.saveToFirebase) {
+            window.saveToFirebase();
+        }
+    }
 
     function getWeekNumber(d) {
         d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -233,7 +275,6 @@
         return day !== 0 && day !== 6 && !feries[key];
     }
 
-    // INTERACTION TACHES
     function selectTask(taskId, event) {
         event.stopPropagation();
         closeQuickEditModal();
@@ -249,24 +290,16 @@
 
     function showQuickEditModal(taskId, event) {
         closeQuickEditModal();
-        const task = state.tasks.find(t => t.id === taskId);
+        const task = window.state.tasks.find(t => t.id === taskId);
         if (!task) return;
-
         const modal = document.createElement('div');
         modal.className = 'quick-edit-modal';
         modal.style.left = event.pageX + 'px';
         modal.style.top = event.pageY + 'px';
-
         let html = `<h4>👥 Personnel affecté</h4>`;
-        state.staff.forEach(s => {
+        window.state.staff.forEach(s => {
             const checked = task.staff.includes(s) ? 'checked' : '';
-            html += `
-                <div class="staff-checkbox">
-                    <input type="checkbox" id="quick_${s}" value="${s}" ${checked} 
-                           onchange="updateTaskStaff(${taskId}, this.value, this.checked)">
-                    <label for="quick_${s}">${s}</label>
-                </div>
-            `;
+            html += `<div class="staff-checkbox"><input type="checkbox" id="quick_${s}" value="${s}" ${checked} onchange="updateTaskStaff(${taskId}, this.value, this.checked)"><label for="quick_${s}">${s}</label></div>`;
         });
         html += `<button class="btn-grey" style="margin-top:10px; width:100%;" onclick="closeQuickEditModal()">Fermer</button>`;
         modal.innerHTML = html;
@@ -276,29 +309,20 @@
     }
 
     function updateTaskStaff(taskId, staffName, isChecked) {
-        const task = state.tasks.find(t => t.id === taskId);
+        const task = window.state.tasks.find(t => t.id === taskId);
         if (!task) return;
         if (isChecked) { if (!task.staff.includes(staffName)) task.staff.push(staffName); }
         else { task.staff = task.staff.filter(s => s !== staffName); }
-        if (task.staff.length === 0) {
-            alert("Au moins une personne requise");
-            task.staff.push(staffName);
-            document.getElementById(`quick_${staffName}`).checked = true;
-            return;
-        }
         saveState();
     }
 
-    function closeQuickEditModal() {
-        if (quickEditModal) { quickEditModal.remove(); quickEditModal = null; document.removeEventListener('click', closeQuickEditModalOnOutsideClick); }
-    }
+    function closeQuickEditModal() { if (quickEditModal) { quickEditModal.remove(); quickEditModal = null; document.removeEventListener('click', closeQuickEditModalOnOutsideClick); } }
     function closeQuickEditModalOnOutsideClick(e) { if (quickEditModal && !quickEditModal.contains(e.target)) closeQuickEditModal(); }
 
-    // REDIMENSIONNEMENT
     function startResize(taskId, direction, event) {
         event.stopPropagation();
         isResizing = true;
-        const task = state.tasks.find(t => t.id === taskId);
+        const task = window.state.tasks.find(t => t.id === taskId);
         resizeData = { taskId, direction, startX: event.pageX, originalStart: new Date(task.start), originalEnd: new Date(task.end) };
         document.addEventListener('mousemove', handleResize);
         document.addEventListener('mouseup', endResize);
@@ -311,74 +335,51 @@
         const deltaX = event.pageX - resizeData.startX;
         const daysDelta = Math.round(deltaX / 50);
         if (daysDelta === 0) return;
-
-        const task = state.tasks.find(t => t.id === resizeData.taskId);
+        const task = window.state.tasks.find(t => t.id === resizeData.taskId);
         let newStart = new Date(resizeData.originalStart);
         let newEnd = new Date(resizeData.originalEnd);
-
-        if (resizeData.direction === 'left') {
-            newStart.setDate(newStart.getDate() + daysDelta);
-            if (newStart >= newEnd) return;
-        } else {
-            newEnd.setDate(newEnd.getDate() + daysDelta);
-            if (newEnd <= newStart) return;
-        }
-
+        if (resizeData.direction === 'left') { newStart.setDate(newStart.getDate() + daysDelta); if (newStart >= newEnd) return; }
+        else { newEnd.setDate(newEnd.getDate() + daysDelta); if (newEnd <= newStart) return; }
         task.start = formatDateKey(newStart);
         task.end = formatDateKey(newEnd);
         task.duration = countBusinessDays(newStart, newEnd);
         render();
     }
 
-    function endResize() {
-        if (isResizing) { isResizing = false; resizeData = null; document.removeEventListener('mousemove', handleResize); document.removeEventListener('mouseup', endResize); document.body.style.cursor = ''; document.body.style.userSelect = ''; saveState(); }
-    }
+    function endResize() { if (isResizing) { isResizing = false; resizeData = null; document.removeEventListener('mousemove', handleResize); document.removeEventListener('mouseup', endResize); document.body.style.cursor = ''; document.body.style.userSelect = ''; saveState(); } }
 
-    // GESTION PERSONNEL
     function addStaff() { 
         let n = document.getElementById('new_staff').value.trim(); 
-        if(n && !state.staff.includes(n)) { 
-            state.staff.push(n); state.staff.sort(); saveState(); 
-            document.getElementById('new_staff').value=''; updateSelectors();
+        if(n && !window.state.staff.includes(n)) { 
+            window.state.staff.push(n); window.state.staff.sort(); saveState(); 
+            document.getElementById('new_staff').value=''; 
         } 
     }
 
     function renameStaff(oldName) {
-        let newName = prompt("Nouveau nom pour " + oldName + " :", oldName);
+        let newName = prompt("Nouveau nom :", oldName);
         if (newName && newName.trim() !== "" && newName !== oldName) {
             newName = newName.trim();
-            const idx = state.staff.indexOf(oldName);
-            if (idx !== -1) state.staff[idx] = newName;
-            state.tasks.forEach(t => { if (t.staff && t.staff.includes(oldName)) t.staff = t.staff.map(s => s === oldName ? newName : s); });
-            state.staff.sort(); saveState(); updateSelectors();
+            const idx = window.state.staff.indexOf(oldName);
+            if (idx !== -1) window.state.staff[idx] = newName;
+            window.state.tasks.forEach(t => { if (t.staff && t.staff.includes(oldName)) t.staff = t.staff.map(s => s === oldName ? newName : s); });
+            saveState();
         }
     }
 
     function removeStaffFromList(name) {
-        if (confirm(`Retirer "${name}" de la liste ? (Il restera sur les tâches actuelles).`)) {
-            state.staff = state.staff.filter(s => s !== name);
-            saveState(); updateSelectors();
-        }
+        if (confirm(`Retirer "${name}" de la liste ?`)) { window.state.staff = window.state.staff.filter(s => s !== name); saveState(); }
     }
 
     function updateSelectors() {
-        document.getElementById('t_proj_sel').innerHTML = state.projects.map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
-        document.getElementById('t_staff_sel').innerHTML = state.staff.map(s => `<option value="${s}">${s}</option>`).join('');
-        document.getElementById('print_proj_sel').innerHTML = state.projects.map(p => `<option value="${p.id}">${p.aff} — ${p.cli}</option>`).join('');
-        document.getElementById('staff-list').innerHTML = state.staff.map(s => `
-            <div class="staff-item">
-                <span>${s}</span>
-                <div class="staff-actions">
-                    <button class="btn-small btn-edit" onclick="renameStaff('${s}')">Modifier</button>
-                    <button class="btn-small btn-delete" onclick="removeStaffFromList('${s}')">Retirer</button>
-                </div>
-            </div>
-        `).join('');
+        document.getElementById('t_proj_sel').innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
+        document.getElementById('t_staff_sel').innerHTML = window.state.staff.map(s => `<option value="${s}">${s}</option>`).join('');
+        document.getElementById('print_proj_sel').innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} — ${p.cli}</option>`).join('');
+        document.getElementById('staff-list').innerHTML = window.state.staff.map(s => `<div class="staff-item"><span>${s}</span><div class="staff-actions"><button class="btn-small btn-edit" onclick="renameStaff('${s}')">Modifier</button><button class="btn-small btn-delete" onclick="removeStaffFromList('${s}')">Retirer</button></div></div>`).join('');
     }
 
-    // ACTIONS PROJETS / TACHES
     function openModalP(id = null) {
-        const p = id ? state.projects.find(x => x.id === id) : null;
+        const p = id ? window.state.projects.find(x => x.id === id) : null;
         document.getElementById('modalP_title').innerText = id ? "Modifier Projet" : "Nouveau Projet";
         document.getElementById('edit_proj_id').value = id || "";
         document.getElementById('p_aff').value = p ? p.aff : "";
@@ -393,16 +394,16 @@
     function saveProject() {
         const id = document.getElementById('edit_proj_id').value;
         const data = { aff: document.getElementById('p_aff').value, cli: document.getElementById('p_cli').value, nature: document.getElementById('p_nature').value, lie: document.getElementById('p_lie').value };
-        if(id) { let idx = state.projects.findIndex(x => x.id === parseInt(id)); state.projects[idx] = { ...state.projects[idx], ...data }; }
-        else { state.projects.push({ id: Date.now(), ...data, color: `hsl(${Math.random()*360}, 65%, 45%)` }); }
+        if(id) { let idx = window.state.projects.findIndex(x => x.id === parseInt(id)); window.state.projects[idx] = { ...window.state.projects[idx], ...data }; }
+        else { window.state.projects.push({ id: Date.now(), ...data, color: `hsl(${Math.random()*360}, 65%, 45%)` }); }
         saveState(); hideModal('modalP');
     }
 
     function delProject() {
-        if(confirm("Supprimer ce projet et ses tâches ?")) {
+        if(confirm("Supprimer ce projet ?")) {
             const id = parseInt(document.getElementById('edit_proj_id').value);
-            state.projects = state.projects.filter(x => x.id !== id);
-            state.tasks = state.tasks.filter(x => x.pId !== id);
+            window.state.projects = window.state.projects.filter(x => x.id !== id);
+            window.state.tasks = window.state.tasks.filter(x => x.pId !== id);
             saveState(); hideModal('modalP');
         }
     }
@@ -418,7 +419,7 @@
     }
 
     function editTask(id) {
-        const t = state.tasks.find(x => x.id === id);
+        const t = window.state.tasks.find(x => x.id === id);
         document.getElementById('modalT_title').innerText = "Modifier Tâche";
         document.getElementById('edit_task_id').value = t.id;
         document.getElementById('t_name').value = t.name;
@@ -444,19 +445,15 @@
             duration: parseInt(document.getElementById('t_dur').value),
             end: addBusinessDays(new Date(document.getElementById('t_start').value), parseInt(document.getElementById('t_dur').value))
         };
-        if(id) state.tasks[state.tasks.findIndex(x => x.id === parseInt(id))] = taskData;
-        else state.tasks.push(taskData);
+        if(id) window.state.tasks[window.state.tasks.findIndex(x => x.id === parseInt(id))] = taskData;
+        else window.state.tasks.push(taskData);
         saveState(); hideModal('modalT');
     }
 
     function delTask() {
-        if(confirm("Supprimer cette tâche ?")) {
-            state.tasks = state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value));
-            saveState(); hideModal('modalT');
-        }
+        if(confirm("Supprimer cette tâche ?")) { window.state.tasks = window.state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value)); saveState(); hideModal('modalT'); }
     }
 
-    // RENDU AVEC BARRES SEGMENTEES
     function render() {
         const y = viewDate.getFullYear(), m = viewDate.getMonth(), daysInM = new Date(y, m + 1, 0).getDate(), feries = getFeries(y);
         document.getElementById('date-display').innerText = viewDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'}).toUpperCase();
@@ -475,79 +472,40 @@
         }
 
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
-        state.projects.forEach(p => {
+        window.state.projects.forEach(p => {
             html += `<tr class="row-p"><td class="col-fixed"><span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} — ${p.cli}</b></span> | ${p.lie}</td><td colspan="${daysInM}"></td></tr>`;
-            state.tasks.filter(t => t.pId === p.id).forEach(t => {
+            window.state.tasks.filter(t => t.pId === p.id).forEach(t => {
                 html += `<tr><td class="col-fixed" style="padding-left:30px;"><span class="task-name" onclick="editTask(${t.id})">${t.name}</span></td>`;
-                
                 let sD = new Date(t.start), eD = new Date(t.end);
-                
-                // Créer un tableau pour tracker les segments de barre
-                let segments = [];
-                let currentSegment = null;
-                
-                // Parcourir chaque jour de la tâche
-                let current = new Date(sD);
+                let segments = [], currentSegment = null, current = new Date(sD);
                 while (current <= eD) {
-                    const isWorking = isWorkingDay(current, feries);
-                    
-                    if (isWorking) {
-                        if (!currentSegment) {
-                            currentSegment = { start: new Date(current), end: new Date(current) };
-                        } else {
-                            currentSegment.end = new Date(current);
-                        }
-                    } else {
-                        if (currentSegment) {
-                            segments.push(currentSegment);
-                            currentSegment = null;
-                        }
-                    }
+                    if (isWorkingDay(current, feries)) {
+                        if (!currentSegment) currentSegment = { start: new Date(current), end: new Date(current) };
+                        else currentSegment.end = new Date(current);
+                    } else if (currentSegment) { segments.push(currentSegment); currentSegment = null; }
                     current.setDate(current.getDate() + 1);
                 }
+                if (currentSegment) segments.push(currentSegment);
                 
-                // Ajouter le dernier segment s'il existe
-                if (currentSegment) {
-                    segments.push(currentSegment);
-                }
-                
-                // Rendre les cellules
                 for(let d=1; d<=daysInM; d++) {
-                    let cur = new Date(y, m, d);
-                    let content = "";
-                    
-                    // Vérifier si ce jour correspond au début d'un segment
-                    segments.forEach((seg, segIndex) => {
+                    let cur = new Date(y, m, d), content = "";
+                    segments.forEach((seg, idx) => {
                         if (cur.toDateString() === seg.start.toDateString()) {
-                            // Calculer la largeur du segment
-                            let segmentDays = Math.ceil((seg.end - seg.start) / 86400000) + 1;
-                            let width = segmentDays * 50;
-                            
-                            const isSelected = selectedTaskId === t.id ? 'selected' : '';
-                            const isFirstSegment = segIndex === 0;
-                            const isLastSegment = segIndex === segments.length - 1;
-                            
-                            content = `<div class="task-bar ${isSelected}" 
-                                            style="background:${p.color}; width:${width-4}px;" 
-                                            onclick="selectTask(${t.id}, event)"
-                                            ondblclick="onTaskDoubleClick(${t.id}, event)">
-                                            ${isFirstSegment ? `<div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', event)"></div>` : ''}
-                                            ${isFirstSegment ? (t.staff || []).map(s => `<div class="staff-tag">${s}</div>`).join('') : ''}
-                                            ${isLastSegment ? `<div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', event)"></div>` : ''}
-                                       </div>`;
+                            let width = (Math.ceil((seg.end - seg.start) / 86400000) + 1) * 50;
+                            content = `<div class="task-bar ${selectedTaskId===t.id?'selected':''}" style="background:${p.color}; width:${width-4}px;" onclick="selectTask(${t.id}, event)" ondblclick="onTaskDoubleClick(${t.id}, event)">${idx===0?`<div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', event)"></div>`:''}${idx===0?(t.staff||[]).map(s=>`<div class="staff-tag">${s}</div>`).join(''):''}${idx===segments.length-1?`<div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', event)"></div>`:''}</div>`;
                         }
                     });
-                    
                     html += `<td class="col-day ${cur.getDay()===0||cur.getDay()===6?'weekend':''}">${content}</td>`;
                 }
                 html += `</tr>`;
             });
         });
         document.getElementById('gantt-table').innerHTML = html + `</tbody></table>`;
+        updateSelectors();
     }
 
     document.addEventListener('click', () => { if (!isResizing) { selectedTaskId = null; render(); } });
-    function showModal(id) { document.getElementById(id).style.display = 'flex'; if(id==='modalPerso') updateSelectors(); }
+    function showModal(id) { document.getElementById(id).style.display = 'flex'; updateSelectors(); }
     function hideModal(id) { document.getElementById(id).style.display = 'none'; }
     function changeMonth(n) { viewDate.setMonth(viewDate.getMonth() + n); render(); }
 
