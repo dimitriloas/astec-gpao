@@ -19,12 +19,10 @@
 
         #date-display { font-weight: bold; font-size: 1.2em; min-width: 220px; text-align: center; color: var(--primary); }
 
-        /* Légende */
         .legend-bar { display: flex; gap: 20px; background: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); font-size: 0.85em; align-items: center; flex-wrap: wrap; }
         .legend-item { display: flex; align-items: center; gap: 6px; }
         .box { width: 18px; height: 18px; border: 1px solid #ddd; border-radius: 3px; }
-        .badge-ex { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; color: white; text-transform: uppercase; }
-
+        
         .gantt-container { background: white; padding: 15px; border-radius: 8px; overflow-x: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); min-height: 400px; }
         table { border-collapse: collapse; width: max-content; min-width: 100%; position: relative; }
         th, td { border: 1px solid #ddd; padding: 0; text-align: center; min-height: 45px; }
@@ -34,32 +32,31 @@
         .ferie { background: var(--ferie) !important; }
         .pont { background: var(--pont) !important; }
 
-        .ferie-header-name { font-size: 10px; color: #d81b60; font-weight: bold; line-height: 1; padding: 2px; }
-
         .col-fixed { position: sticky; left: 0; background: #fff; width: 400px; text-align: left; z-index: 20; border-right: 5px solid var(--primary); padding: 8px 15px; }
         .row-p { background: #e9ecef; font-weight: bold; }
-        
         .task-name { cursor: pointer; color: var(--accent); text-decoration: underline; font-weight: bold; }
 
         .task-bar {
             position: absolute; top: 2px; left: 2px; z-index: 10; border-radius: 4px;
-            color: white; display: flex; flex-direction: column; gap: 2px; padding: 4px;
-            font-size: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            overflow: hidden; box-sizing: border-box; cursor: pointer; height: 42px;
+            color: white; display: flex; flex-direction: row; flex-wrap: wrap; gap: 2px; padding: 3px;
+            font-size: 9px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            overflow-y: auto; box-sizing: border-box; cursor: pointer; height: 42px;
         }
         .task-bar.selected { box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.5); z-index: 15; }
 
-        .staff-tag { background: rgba(255,255,255,0.25); padding: 1px 4px; border-radius: 2px; white-space: nowrap; margin-right: 2px; }
-        .loc-tag { font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-bottom: 2px; align-self: flex-start; text-transform: uppercase; }
-        .loc-atelier { background: #7f8c8d; color: white; }
-        .loc-client { background: #d35400; color: white; }
+        /* Style des étiquettes personnels colorées selon le lieu */
+        .staff-tag { padding: 1px 4px; border-radius: 2px; white-space: nowrap; color: white; border: 1px solid rgba(255,255,255,0.3); }
+        .staff-atelier { background: #7f8c8d !important; } /* Gris */
+        .staff-client { background: #e67e22 !important; }  /* Orange */
 
         .resize-handle { position: absolute; top: 0; width: 8px; height: 100%; cursor: ew-resize; z-index: 20; opacity: 0; }
         .task-bar.selected .resize-handle { opacity: 1; background: rgba(255,255,255,0.3); }
 
         .modal { display: none; position: fixed; z-index: 100; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
         .modal-content { background: white; padding: 25px; border-radius: 8px; width: 450px; display: flex; flex-direction: column; gap: 12px; }
-        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        
+        .quick-edit-modal { position: absolute; background: white; border: 2px solid var(--accent); border-radius: 8px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 200; min-width: 220px; }
+        .staff-checkbox { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 13px; color: #333; }
         
         .staff-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #eee; }
     </style>
@@ -76,7 +73,7 @@
         <button class="btn-blue" onclick="newTask()">+ Tâche</button>
         <button style="background: #9b59b6;" onclick="showModal('modalPerso')">👥 Personnel / Ponts</button>
         <div style="display: flex; gap: 5px; align-items: center; margin-left: auto;">
-            <input type="text" id="search-affaire" placeholder="🔍 Rechercher N° Affaire" onkeyup="searchProject(event)">
+            <input type="text" id="search-affaire" placeholder="🔍 Rechercher N° Affaire" onkeyup="searchProject(event)" style="padding:10px; border-radius:4px; border:1px solid #ccc;">
         </div>
     </div>
 </div>
@@ -87,8 +84,8 @@
     <div class="legend-item"><div class="box" style="background: var(--ferie);"></div> Jour Férié</div>
     <div class="legend-item"><div class="box" style="background: var(--pont);"></div> Pont manuel</div>
     <div style="border-left: 1px solid #ccc; height: 20px; margin: 0 10px;"></div>
-    <div class="legend-item"><span class="badge-ex" style="background: #7f8c8d;">Atelier</span> En interne</div>
-    <div class="legend-item"><span class="badge-ex" style="background: #d35400;">Client</span> Sur site</div>
+    <div class="legend-item"><div class="box staff-atelier" style="width:14px; height:14px;"></div> Perso. en Atelier</div>
+    <div class="legend-item"><div class="box staff-client" style="width:14px; height:14px;"></div> Perso. sur Site</div>
 </div>
 
 <div class="gantt-container" id="gantt-table"></div>
@@ -97,25 +94,24 @@
     <h3 id="modalP_title">Projet</h3>
     <input type="hidden" id="edit_proj_id"><input type="text" id="p_aff" placeholder="N° Affaire"><input type="text" id="p_cli" placeholder="Client"><input type="text" id="p_nature" placeholder="Nature"><input type="text" id="p_lie" placeholder="Lieu">
     <button class="btn-green" onclick="saveProject()">Enregistrer</button>
-    <button id="btn_del_proj" class="btn-red" onclick="delProject()">Supprimer</button>
     <button class="btn-grey" onclick="hideModal('modalP')">Fermer</button>
 </div></div>
 
 <div id="modalT" class="modal"><div class="modal-content">
     <h3 id="modalT_title">Tâche</h3>
     <input type="hidden" id="edit_task_id">
-    <select id="t_proj_sel"></select>
-    <input type="text" id="t_name" placeholder="Désignation">
-    <label>Lieu :</label>
+    <select id="t_proj_sel" style="padding:10px;"></select>
+    <input type="text" id="t_name" placeholder="Désignation" style="padding:10px;">
+    <label>Lieu d'exécution :</label>
     <div style="display:flex; gap:20px;">
-        <label><input type="radio" name="t_location" value="atelier" checked> Atelier</label>
-        <label><input type="radio" name="t_location" value="client"> Site Client</label>
+        <label><input type="radio" name="t_location" value="atelier" checked> Atelier (Gris)</label>
+        <label><input type="radio" name="t_location" value="client"> Site Client (Orange)</label>
     </div>
     <label>Personnel :</label>
-    <select id="t_staff_sel" multiple style="height: 80px;"></select>
+    <select id="t_staff_sel" multiple style="height: 100px; padding:5px;"></select>
     <div style="display:flex; gap:10px;">
-        <input type="date" id="t_start" style="flex:1">
-        <input type="number" id="t_dur" value="1" min="1" style="width:70px">
+        <input type="date" id="t_start" style="flex:1; padding:10px;">
+        <input type="number" id="t_dur" value="1" min="1" style="width:70px; padding:10px;">
     </div>
     <button class="btn-blue" onclick="saveTask()">Enregistrer</button>
     <button id="btn_del_task" class="btn-red" onclick="delTask()">Supprimer</button>
@@ -125,10 +121,10 @@
 <div id="modalPerso" class="modal"><div class="modal-content">
     <h3>Personnel & Ponts</h3>
     <div id="staff-list" style="max-height: 100px; overflow-y: auto; border: 1px solid #eee;"></div>
-    <div style="display:flex; gap:5px;"><input type="text" id="new_staff" placeholder="Nom"><button class="btn-green" onclick="addStaff()">+</button></div>
+    <div style="display:flex; gap:5px;"><input type="text" id="new_staff" placeholder="Nom" style="flex:1; padding:5px;"><button class="btn-green" onclick="addStaff()">+</button></div>
     <hr>
     <div id="pont-list" style="max-height: 100px; overflow-y: auto; border: 1px solid #eee;"></div>
-    <div style="display:flex; gap:5px;"><input type="date" id="new_pont_date"><button class="btn-orange" onclick="addPont()">Ajouter Pont</button></div>
+    <div style="display:flex; gap:5px;"><input type="date" id="new_pont_date" style="flex:1; padding:5px;"><button class="btn-orange" onclick="addPont()">Ajouter Pont</button></div>
     <button class="btn-grey" onclick="hideModal('modalPerso')">Fermer</button>
 </div></div>
 
@@ -171,6 +167,7 @@
     let selectedTaskId = null;
     let isResizing = false;
     let resizeData = null;
+    let quickEditModal = null;
     let searchFilter = null;
 
     function formatDateKey(date) {
@@ -244,10 +241,59 @@
         return d;
     }
 
+    // Gestion de la sélection et du Double Clic
     function selectTask(taskId, event) {
         event.stopPropagation();
+        closeQuickEdit();
         selectedTaskId = (selectedTaskId === taskId) ? null : taskId;
         render();
+    }
+
+    function onTaskDoubleClick(taskId, event) {
+        event.stopPropagation();
+        showQuickEdit(taskId, event);
+    }
+
+    function showQuickEdit(taskId, event) {
+        closeQuickEdit();
+        const task = window.state.tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const modal = document.createElement('div');
+        modal.className = 'quick-edit-modal';
+        modal.style.left = event.pageX + 'px';
+        modal.style.top = event.pageY + 'px';
+
+        let html = `<h4 style="margin:0 0 10px 0; font-size:12px;">Modifier Personnel</h4>`;
+        window.state.staff.forEach(s => {
+            const checked = task.staff.includes(s) ? 'checked' : '';
+            html += `<div class="staff-checkbox">
+                <input type="checkbox" id="q_${s}" ${checked} onchange="toggleQuickStaff(${taskId}, '${s}', this.checked)">
+                <label for="q_${s}">${s}</label>
+            </div>`;
+        });
+        html += `<button class="btn-grey" style="width:100%; margin-top:10px; padding:5px; font-size:11px;" onclick="closeQuickEdit()">Fermer</button>`;
+        
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+        quickEditModal = modal;
+        
+        // Empêcher la fermeture immédiate
+        setTimeout(() => document.addEventListener('click', closeQuickEdit), 10);
+    }
+
+    function toggleQuickStaff(taskId, staffName, isChecked) {
+        const task = window.state.tasks.find(t => t.id === taskId);
+        if (!task) return;
+        if (isChecked) { if(!task.staff.includes(staffName)) task.staff.push(staffName); }
+        else { task.staff = task.staff.filter(s => s !== staffName); }
+        saveState();
+        render();
+    }
+
+    function closeQuickEdit() {
+        if (quickEditModal) { quickEditModal.remove(); quickEditModal = null; }
+        document.removeEventListener('click', closeQuickEdit);
     }
 
     function startResize(taskId, direction, event) {
@@ -292,8 +338,8 @@
     function updateSelectors() {
         document.getElementById('t_proj_sel').innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
         document.getElementById('t_staff_sel').innerHTML = window.state.staff.map(s => `<option value="${s}">${s}</option>`).join('');
-        document.getElementById('staff-list').innerHTML = window.state.staff.map(s => `<div class="staff-item"><span>${s}</span><button class="btn-small btn-red" onclick="removeStaffFromList('${s}')">X</button></div>`).join('');
-        document.getElementById('pont-list').innerHTML = (window.state.ponts || []).map(p => `<div class="staff-item"><span>${new Date(p).toLocaleDateString()}</span><button class="btn-small btn-red" onclick="removePont('${p}')">X</button></div>`).join('');
+        document.getElementById('staff-list').innerHTML = window.state.staff.map(s => `<div class="staff-item"><span>${s}</span><button class="btn-small btn-red" onclick="removeStaffFromList('${s}')" style="padding:2px 5px; border-radius:3px; border:none; color:white; background:red; cursor:pointer;">X</button></div>`).join('');
+        document.getElementById('pont-list').innerHTML = (window.state.ponts || []).map(p => `<div class="staff-item"><span>${new Date(p).toLocaleDateString()}</span><button class="btn-small btn-red" onclick="removePont('${p}')" style="padding:2px 5px; border-radius:3px; border:none; color:white; background:red; cursor:pointer;">X</button></div>`).join('');
     }
 
     function removeStaffFromList(name) { if (confirm(`Retirer ${name} ?`)) { window.state.staff = window.state.staff.filter(s => s !== name); saveState(); updateSelectors(); } }
@@ -307,7 +353,6 @@
         document.getElementById('p_cli').value = p ? p.cli : "";
         document.getElementById('p_nature').value = p ? p.nature : "";
         document.getElementById('p_lie').value = p ? p.lie : "";
-        document.getElementById('btn_del_proj').style.display = id ? "block" : "none";
         showModal('modalP');
     }
 
@@ -403,11 +448,11 @@
                     segments.forEach((seg, idx) => {
                         if (cur.toDateString() === seg.start.toDateString()) {
                             let width = (Math.ceil((seg.end - seg.start) / 86400000) + 1) * 50;
-                            let locClass = t.location === 'client' ? 'loc-client' : 'loc-atelier';
-                            let locLabel = t.location === 'client' ? 'Client' : 'Atelier';
-                            content = `<div class="task-bar ${selectedTaskId===t.id?'selected':''}" style="background:${p.color}; width:${width-4}px;" onclick="selectTask(${t.id}, event)">
-                                ${idx===0?`<div class="loc-tag ${locClass}">${locLabel}</div>`:''}
-                                <div style="display:flex; flex-wrap:wrap; gap:2px">${idx===0?(t.staff||[]).map(s=>`<span class="staff-tag">${s}</span>`).join(''):''}</div>
+                            // Détermination de la couleur du personnel selon le lieu
+                            let staffColorClass = t.location === 'client' ? 'staff-client' : 'staff-atelier';
+                            
+                            content = `<div class="task-bar ${selectedTaskId===t.id?'selected':''}" style="background:${p.color}; width:${width-4}px;" onclick="selectTask(${t.id}, event)" ondblclick="onTaskDoubleClick(${t.id}, event)">
+                                ${idx===0?(t.staff||[]).map(s=>`<span class="staff-tag ${staffColorClass}">${s}</span>`).join(''):''}
                                 ${idx===0?`<div class="resize-handle" style="left:0" onmousedown="startResize(${t.id},'left',event)"></div>`:''}
                                 ${idx===segments.length-1?`<div class="resize-handle" style="right:0" onmousedown="startResize(${t.id},'right',event)"></div>`:''}
                             </div>`;
@@ -424,8 +469,8 @@
     function showModal(id) { updateSelectors(); document.getElementById(id).style.display = 'flex'; }
     function hideModal(id) { document.getElementById(id).style.display = 'none'; }
     function changeMonth(n) { viewDate.setMonth(viewDate.getMonth() + n); render(); }
-    document.addEventListener('click', () => { if(!isResizing) { selectedTaskId = null; render(); } });
-
+    
+    // Initialisation
     render();
 </script>
 </body>
