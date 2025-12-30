@@ -542,8 +542,20 @@
         }
 
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
-        window.state.projects.forEach(p => {
-            html += `<tr class="row-p"><td class="col-fixed"><span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} — ${p.cli}</b></span> | ${p.lie}</td><td colspan="${daysInM}"></td></tr>`;
+        
+        // Filtrer uniquement les projets qui ont au moins une tâche
+        const projectsWithTasks = window.state.projects.filter(p => 
+            window.state.tasks.some(t => t.pId === p.id)
+        );
+        
+        projectsWithTasks.forEach(p => {
+            html += `<tr class="row-p"><td class="col-fixed">
+                <span class="proj-name" onclick="openModalP(${p.id})">
+                    <b>${p.aff} — ${p.cli}</b>
+                    <div style="font-size:0.85em; color:#7f8c8d; margin-top:2px;">${p.nature || ''}</div>
+                </span>
+                <div style="font-size:0.9em; color:#95a5a6; margin-top:3px;">${p.lie}</div>
+            </td><td colspan="${daysInM}"></td></tr>`;
             window.state.tasks.filter(t => t.pId === p.id).forEach(t => {
                 html += `<tr><td class="col-fixed" style="padding-left:30px;"><span class="task-name" onclick="editTask(${t.id})">${t.name}</span></td>`;
                 let sD = new Date(t.start), eD = new Date(t.end);
