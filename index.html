@@ -50,6 +50,8 @@
             cursor: pointer;
             pointer-events: auto;
             transition: box-shadow 0.2s;
+            height: 42px;
+            min-height: 42px;
         }
 
         .task-bar:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
@@ -610,8 +612,11 @@
                 segments.forEach((seg, idx) => {
                     if (cur.toDateString() === seg.start.toDateString()) {
                         let width = (Math.ceil((seg.end - seg.start) / 86400000) + 1) * 50;
-                        let staffDisplay = showStaff ? (t.staff||[]).map(s=>`<div class="staff-tag">${s}</div>`).join('') : '';
-                        content = `<div class="task-bar" style="background:${project.color}; width:${width-4}px;">${idx===0?staffDisplay:''}</div>`;
+                        let staffDisplay = '';
+                        if (showStaff && idx === 0) {
+                            staffDisplay = (t.staff||[]).map(s=>`<div class="staff-tag">${s}</div>`).join('');
+                        }
+                        content = `<div class="task-bar" style="background:${project.color}; width:${width-4}px;">${staffDisplay}</div>`;
                     }
                 });
                 html += `<td class="col-day ${cur.getDay()===0||cur.getDay()===6?'weekend':''}">${content}</td>`;
