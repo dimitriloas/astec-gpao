@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ASTEC GPAO - Planning Expert</title>
+    <title>ASTEC GPAO - Gestion Projets</title>
     <style>
         :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60; --weekend: #e8f5e9; --ferie: #fce4ec; --pont: #fff9c4; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 20px; background: #f4f7f6; }
@@ -15,46 +15,53 @@
         .btn-green { background: var(--success); }
         .btn-red { background: var(--danger); }
         .btn-grey { background: #7f8c8d; }
+        .btn-orange { background: #e67e22; }
 
         #date-display { font-weight: bold; font-size: 1.2em; min-width: 220px; text-align: center; color: var(--primary); }
 
-        .gantt-container { background: white; padding: 15px; border-radius: 8px; overflow-x: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        table { border-collapse: collapse; width: max-content; min-width: 100%; position: relative; }
-        th, td { border: 1px solid #ddd; padding: 0; text-align: center; vertical-align: middle; position: relative; }
+        /* Légende */
+        .legend-bar { display: flex; gap: 20px; background: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); font-size: 0.85em; align-items: center; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .box { width: 18px; height: 18px; border: 1px solid #ddd; border-radius: 3px; }
+        .badge-ex { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; color: white; text-transform: uppercase; }
 
-        .col-day { width: 50px; min-width: 50px; height: 50px; }
+        .gantt-container { background: white; padding: 15px; border-radius: 8px; overflow-x: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); min-height: 400px; }
+        table { border-collapse: collapse; width: max-content; min-width: 100%; position: relative; }
+        th, td { border: 1px solid #ddd; padding: 0; text-align: center; min-height: 45px; }
+
+        .col-day { width: 50px; min-width: 50px; height: 50px; position: relative; }
         .weekend { background: var(--weekend) !important; }
         .ferie { background: var(--ferie) !important; }
         .pont { background: var(--pont) !important; }
 
-        .col-fixed { position: sticky; left: 0; background: #fff; width: 350px; text-align: left; z-index: 30; border-right: 4px solid var(--primary); padding: 8px 15px; }
-        .row-p { background: #f1f3f5; font-weight: bold; cursor: pointer; }
-        .task-name { cursor: pointer; color: var(--accent); text-decoration: underline; font-size: 13px; }
+        .ferie-header-name { font-size: 10px; color: #d81b60; font-weight: bold; line-height: 1; padding: 2px; }
 
-        /* Barre de tâche avec découpe */
+        .col-fixed { position: sticky; left: 0; background: #fff; width: 400px; text-align: left; z-index: 20; border-right: 5px solid var(--primary); padding: 8px 15px; }
+        .row-p { background: #e9ecef; font-weight: bold; }
+        
+        .task-name { cursor: pointer; color: var(--accent); text-decoration: underline; font-weight: bold; }
+
         .task-bar {
-            position: absolute; top: 4px; left: 2px; height: calc(100% - 8px);
-            z-index: 10; border-radius: 4px; color: white;
-            display: flex; flex-wrap: wrap; align-content: flex-start; gap: 2px; padding: 4px;
+            position: absolute; top: 2px; left: 2px; z-index: 10; border-radius: 4px;
+            color: white; display: flex; flex-direction: column; gap: 2px; padding: 4px;
             font-size: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            box-sizing: border-box; cursor: pointer;
+            overflow: hidden; box-sizing: border-box; cursor: pointer; height: 42px;
         }
-        .task-bar.selected { outline: 3px solid #34495e; z-index: 25; }
+        .task-bar.selected { box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.5); z-index: 15; }
 
-        .staff-tag { padding: 1px 4px; border-radius: 2px; white-space: nowrap; color: white; border: 1px solid rgba(255,255,255,0.3); font-size: 9px; }
-        .staff-atelier { background: #7f8c8d !important; } 
-        .staff-client { background: #e67e22 !important; }
+        .staff-tag { background: rgba(255,255,255,0.25); padding: 1px 4px; border-radius: 2px; white-space: nowrap; margin-right: 2px; }
+        .loc-tag { font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-bottom: 2px; align-self: flex-start; text-transform: uppercase; }
+        .loc-atelier { background: #7f8c8d; color: white; }
+        .loc-client { background: #d35400; color: white; }
 
-        /* Poignées de redimensionnement */
-        .resize-handle { position: absolute; top: 0; width: 10px; height: 100%; cursor: ew-resize; z-index: 30; background: rgba(255,255,255,0.2); display: none; }
-        .task-bar.selected .resize-handle { display: block; }
-        .resize-handle.left { left: 0; border-radius: 4px 0 0 4px; }
-        .resize-handle.right { right: 0; border-radius: 0 4px 4px 0; }
+        .resize-handle { position: absolute; top: 0; width: 8px; height: 100%; cursor: ew-resize; z-index: 20; opacity: 0; }
+        .task-bar.selected .resize-handle { opacity: 1; background: rgba(255,255,255,0.3); }
 
-        .quick-edit-modal { position: absolute; background: white; border-radius: 8px; padding: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.3); z-index: 2000; min-width: 250px; border: 1px solid #ccc; }
-        .modal { display: none; position: fixed; z-index: 1000; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
-        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 400px; display: flex; flex-direction: column; gap: 12px; }
+        .modal { display: none; position: fixed; z-index: 100; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 450px; display: flex; flex-direction: column; gap: 12px; }
         input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        
+        .staff-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #eee; }
     </style>
 </head>
 <body>
@@ -67,45 +74,61 @@
         <button class="btn-blue" onclick="changeMonth(1)">Suivant ▶</button>
         <button class="btn-green" onclick="openModalP()">+ Projet</button>
         <button class="btn-blue" onclick="newTask()">+ Tâche</button>
-        <button style="background: #9b59b6;" onclick="showModal('modalPerso')">👥 Paramètres</button>
+        <button style="background: #9b59b6;" onclick="showModal('modalPerso')">👥 Personnel / Ponts</button>
+        <div style="display: flex; gap: 5px; align-items: center; margin-left: auto;">
+            <input type="text" id="search-affaire" placeholder="🔍 Rechercher N° Affaire" onkeyup="searchProject(event)">
+        </div>
     </div>
+</div>
+
+<div class="legend-bar">
+    <span style="font-weight: bold; color: var(--primary);">Légende :</span>
+    <div class="legend-item"><div class="box" style="background: var(--weekend);"></div> Week-end</div>
+    <div class="legend-item"><div class="box" style="background: var(--ferie);"></div> Jour Férié</div>
+    <div class="legend-item"><div class="box" style="background: var(--pont);"></div> Pont manuel</div>
+    <div style="border-left: 1px solid #ccc; height: 20px; margin: 0 10px;"></div>
+    <div class="legend-item"><span class="badge-ex" style="background: #7f8c8d;">Atelier</span> En interne</div>
+    <div class="legend-item"><span class="badge-ex" style="background: #d35400;">Client</span> Sur site</div>
 </div>
 
 <div class="gantt-container" id="gantt-table"></div>
 
 <div id="modalP" class="modal"><div class="modal-content">
     <h3 id="modalP_title">Projet</h3>
-    <input type="hidden" id="edit_proj_id">
-    <input type="text" id="p_aff" placeholder="N° Affaire">
-    <input type="text" id="p_cli" placeholder="Client">
-    <input type="text" id="p_nature" placeholder="Nature (ex: Tuyauterie)">
-    <input type="text" id="p_lie" placeholder="Lieu (ex: Usine Nord)">
+    <input type="hidden" id="edit_proj_id"><input type="text" id="p_aff" placeholder="N° Affaire"><input type="text" id="p_cli" placeholder="Client"><input type="text" id="p_nature" placeholder="Nature"><input type="text" id="p_lie" placeholder="Lieu">
     <button class="btn-green" onclick="saveProject()">Enregistrer</button>
-    <button class="btn-red" onclick="delProject()">Supprimer</button>
+    <button id="btn_del_proj" class="btn-red" onclick="delProject()">Supprimer</button>
     <button class="btn-grey" onclick="hideModal('modalP')">Fermer</button>
 </div></div>
 
 <div id="modalT" class="modal"><div class="modal-content">
-    <h3>Tâche</h3>
+    <h3 id="modalT_title">Tâche</h3>
     <input type="hidden" id="edit_task_id">
     <select id="t_proj_sel"></select>
     <input type="text" id="t_name" placeholder="Désignation">
+    <label>Lieu :</label>
+    <div style="display:flex; gap:20px;">
+        <label><input type="radio" name="t_location" value="atelier" checked> Atelier</label>
+        <label><input type="radio" name="t_location" value="client"> Site Client</label>
+    </div>
+    <label>Personnel :</label>
+    <select id="t_staff_sel" multiple style="height: 80px;"></select>
     <div style="display:flex; gap:10px;">
-        <input type="date" id="t_start">
+        <input type="date" id="t_start" style="flex:1">
         <input type="number" id="t_dur" value="1" min="1" style="width:70px">
     </div>
     <button class="btn-blue" onclick="saveTask()">Enregistrer</button>
-    <button class="btn-red" onclick="delTask()">Supprimer</button>
+    <button id="btn_del_task" class="btn-red" onclick="delTask()">Supprimer</button>
     <button class="btn-grey" onclick="hideModal('modalT')">Annuler</button>
 </div></div>
 
 <div id="modalPerso" class="modal"><div class="modal-content">
-    <h3>Configuration</h3>
-    <div id="staff-list" style="max-height: 100px; overflow-y: auto; border: 1px solid #eee; margin-bottom:10px;"></div>
+    <h3>Personnel & Ponts</h3>
+    <div id="staff-list" style="max-height: 100px; overflow-y: auto; border: 1px solid #eee;"></div>
     <div style="display:flex; gap:5px;"><input type="text" id="new_staff" placeholder="Nom"><button class="btn-green" onclick="addStaff()">+</button></div>
     <hr>
-    <div id="pont-list"></div>
-    <input type="date" id="new_pont_date"><button class="btn-orange" onclick="addPont()">Ajouter Pont</button>
+    <div id="pont-list" style="max-height: 100px; overflow-y: auto; border: 1px solid #eee;"></div>
+    <div style="display:flex; gap:5px;"><input type="date" id="new_pont_date"><button class="btn-orange" onclick="addPont()">Ajouter Pont</button></div>
     <button class="btn-grey" onclick="hideModal('modalPerso')">Fermer</button>
 </div></div>
 
@@ -131,6 +154,10 @@
         const data = snapshot.val();
         if (data) {
             window.state = data;
+            if (!window.state.projects) window.state.projects = [];
+            if (!window.state.tasks) window.state.tasks = [];
+            if (!window.state.staff) window.state.staff = [];
+            if (!window.state.ponts) window.state.ponts = [];
             render();
         }
     });
@@ -144,7 +171,7 @@
     let selectedTaskId = null;
     let isResizing = false;
     let resizeData = null;
-    let quickEditModal = null;
+    let searchFilter = null;
 
     function formatDateKey(date) {
         const d = new Date(date);
@@ -157,53 +184,75 @@
             return new Date(y, n - 1, p + 1);
         };
         const p = paques(year);
-        const f = { [`${year}-01-01`]: "An", [`${year}-05-01`]: "Travail", [`${year}-05-08`]: "1945", [`${year}-07-14`]: "National", [`${year}-08-15`]: "Assompt.", [`${year}-11-01`]: "Toussaint", [`${year}-11-11`]: "Armist.", [`${year}-12-25`]: "Noël" };
-        if (window.state.ponts) window.state.ponts.forEach(d => f[d] = "PONT");
+        const lP = new Date(p); lP.setDate(p.getDate() + 1);
+        const asc = new Date(p); asc.setDate(p.getDate() + 39);
+        const lPent = new Date(p); lPent.setDate(p.getDate() + 50);
+        let f = {
+            [`${year}-01-01`]: "An", [`${year}-05-01`]: "Travail", [`${year}-05-08`]: "1945",
+            [`${year}-07-14`]: "National", [`${year}-08-15`]: "Assompt.", [`${year}-11-01`]: "Toussaint",
+            [`${year}-11-11`]: "Armist.", [`${year}-12-25`]: "Noël",
+            [formatDateKey(lP)]: "Pâques", [formatDateKey(asc)]: "Ascens.", [formatDateKey(lPent)]: "Pentec."
+        };
+        if (window.state.ponts) window.state.ponts.forEach(date => { f[date] = "PONT"; });
         return f;
     }
 
+    function saveState() { if (window.saveToFirebase) window.saveToFirebase(); }
+
+    function getWeekNumber(d) {
+        d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+        return Math.ceil((((d - new Date(Date.UTC(d.getUTCFullYear(), 0, 1))) / 86400000) + 1) / 7);
+    }
+
     function isWorkingDay(date, feries) {
-        return date.getDay() !== 0 && date.getDay() !== 6 && !feries[formatDateKey(date)];
+        const day = date.getDay();
+        const key = formatDateKey(date);
+        return day !== 0 && day !== 6 && !feries[key];
+    }
+
+    function addBusinessDays(startDate, days) {
+        let d = new Date(startDate);
+        let c = 0;
+        const feries = getFeries(d.getFullYear());
+        while (c < days) {
+            if (isWorkingDay(d, feries)) c++;
+            if (c < days) d.setDate(d.getDate() + 1);
+        }
+        return formatDateKey(d);
     }
 
     function countBusinessDays(start, end) {
-        let count = 0, cur = new Date(start), e = new Date(end), f = getFeries(cur.getFullYear());
-        while (cur <= e) { if (isWorkingDay(cur, f)) count++; cur.setDate(cur.getDate()+1); }
+        let count = 0, current = new Date(start), endDate = new Date(end);
+        const feries = getFeries(current.getFullYear());
+        while (current <= endDate) {
+            if (isWorkingDay(current, feries)) count++;
+            current.setDate(current.getDate() + 1);
+        }
         return count;
     }
 
     function addWorkingDays(date, delta, feries) {
-        let d = new Date(date), count = 0, dir = delta > 0 ? 1 : -1, target = Math.abs(delta);
-        while (count < target) { d.setDate(d.getDate() + dir); if (isWorkingDay(d, feries)) count++; }
+        let d = new Date(date);
+        let count = 0;
+        const direction = delta > 0 ? 1 : -1;
+        const target = Math.abs(delta);
+        while (count < target) {
+            d.setDate(d.getDate() + direction);
+            if (isWorkingDay(d, feries)) count++;
+        }
         return d;
     }
 
-    function onTaskDoubleClick(taskId, event) {
+    function selectTask(taskId, event) {
         event.stopPropagation();
-        closeQuickEdit();
-        const t = window.state.tasks.find(x => x.id === taskId);
-        const modal = document.createElement('div');
-        modal.className = 'quick-edit-modal';
-        modal.style.left = event.pageX + 'px'; modal.style.top = event.pageY + 'px';
-        let html = `<b>${t.name}</b><br><small>Lieu :</small><br>
-            <input type="radio" name="ql" value="atelier" ${t.location==='atelier'?'checked':''} onchange="updateQ(${taskId},'location','atelier')"> Atelier
-            <input type="radio" name="ql" value="client" ${t.location==='client'?'checked':''} onchange="updateQ(${taskId},'location','client')"> Site<br>
-            <small>Personnel :</small><div style="max-height:100px; overflow-y:auto; border:1px solid #ddd; padding:2px;">`;
-        window.state.staff.forEach(s => {
-            const c = (t.staff||[]).includes(s) ? 'checked' : '';
-            html += `<label style="display:block; font-size:11px;"><input type="checkbox" ${c} onchange="toggleQS(${taskId},'${s}',this.checked)"> ${s}</label>`;
-        });
-        html += `</div><button class="btn-blue" style="width:100%; margin-top:5px;" onclick="closeQuickEdit()">Fermer</button>`;
-        modal.innerHTML = html; document.body.appendChild(modal); quickEditModal = modal;
-        setTimeout(() => document.addEventListener('click', closeQuickEdit), 10);
+        selectedTaskId = (selectedTaskId === taskId) ? null : taskId;
+        render();
     }
 
-    function updateQ(id, f, v) { const t = window.state.tasks.find(x => x.id === id); t[f] = v; saveToFirebase(); render(); }
-    function toggleQS(id, n, c) { const t = window.state.tasks.find(x => x.id === id); if(!t.staff) t.staff = []; if(c) t.staff.push(n); else t.staff = t.staff.filter(s => s !== n); saveToFirebase(); render(); }
-    function closeQuickEdit() { if(quickEditModal) { quickEditModal.remove(); quickEditModal = null; } }
-
     function startResize(taskId, direction, event) {
-        event.stopPropagation(); isResizing = true;
+        event.stopPropagation();
+        isResizing = true;
         const task = window.state.tasks.find(t => t.id === taskId);
         resizeData = { taskId, direction, startX: event.pageX, originalStart: new Date(task.start), originalEnd: new Date(task.end), lastDelta: 0 };
         document.addEventListener('mousemove', handleResize);
@@ -217,26 +266,48 @@
         if (daysDelta === resizeData.lastDelta) return;
         resizeData.lastDelta = daysDelta;
         const task = window.state.tasks.find(t => t.id === resizeData.taskId);
-        const f = getFeries(new Date(task.start).getFullYear());
+        const feries = getFeries(new Date(task.start).getFullYear());
         if (resizeData.direction === 'left') {
-            let nS = addWorkingDays(resizeData.originalStart, daysDelta, f);
-            if (nS < new Date(task.end)) { task.start = formatDateKey(nS); task.duration = countBusinessDays(nS, new Date(task.end)); }
+            let newStart = addWorkingDays(resizeData.originalStart, daysDelta, feries);
+            if (newStart < new Date(task.end)) { task.start = formatDateKey(newStart); task.duration = countBusinessDays(newStart, new Date(task.end)); }
         } else {
-            let nE = addWorkingDays(resizeData.originalEnd, daysDelta, f);
-            if (nE > new Date(task.start)) { task.end = formatDateKey(nE); task.duration = countBusinessDays(new Date(task.start), nE); }
+            let newEnd = addWorkingDays(resizeData.originalEnd, daysDelta, feries);
+            if (newEnd > new Date(task.start)) { task.end = formatDateKey(newEnd); task.duration = countBusinessDays(new Date(task.start), newEnd); }
         }
         render();
     }
 
-    function endResize() { isResizing = false; resizeData = null; document.removeEventListener('mousemove', handleResize); document.removeEventListener('mouseup', endResize); saveToFirebase(); }
+    function endResize() { if (isResizing) { isResizing = false; resizeData = null; document.removeEventListener('mousemove', handleResize); document.removeEventListener('mouseup', endResize); saveState(); } }
+
+    function addStaff() { 
+        let n = document.getElementById('new_staff').value.trim(); 
+        if(n && !window.state.staff.includes(n)) { window.state.staff.push(n); window.state.staff.sort(); saveState(); document.getElementById('new_staff').value=''; updateSelectors(); } 
+    }
+
+    function addPont() {
+        let d = document.getElementById('new_pont_date').value;
+        if(d && !window.state.ponts.includes(d)) { window.state.ponts.push(d); window.state.ponts.sort(); saveState(); updateSelectors(); render(); }
+    }
+
+    function updateSelectors() {
+        document.getElementById('t_proj_sel').innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
+        document.getElementById('t_staff_sel').innerHTML = window.state.staff.map(s => `<option value="${s}">${s}</option>`).join('');
+        document.getElementById('staff-list').innerHTML = window.state.staff.map(s => `<div class="staff-item"><span>${s}</span><button class="btn-small btn-red" onclick="removeStaffFromList('${s}')">X</button></div>`).join('');
+        document.getElementById('pont-list').innerHTML = (window.state.ponts || []).map(p => `<div class="staff-item"><span>${new Date(p).toLocaleDateString()}</span><button class="btn-small btn-red" onclick="removePont('${p}')">X</button></div>`).join('');
+    }
+
+    function removeStaffFromList(name) { if (confirm(`Retirer ${name} ?`)) { window.state.staff = window.state.staff.filter(s => s !== name); saveState(); updateSelectors(); } }
+    function removePont(d) { if(confirm(`Supprimer pont ?`)) { window.state.ponts = window.state.ponts.filter(p => p !== d); saveState(); updateSelectors(); render(); } }
 
     function openModalP(id = null) {
         const p = id ? window.state.projects.find(x => x.id === id) : null;
+        document.getElementById('modalP_title').innerText = id ? "Modifier Projet" : "Nouveau Projet";
         document.getElementById('edit_proj_id').value = id || "";
         document.getElementById('p_aff').value = p ? p.aff : "";
         document.getElementById('p_cli').value = p ? p.cli : "";
-        document.getElementById('p_nature').value = p ? (p.nature || "") : "";
-        document.getElementById('p_lie').value = p ? (p.lie || "") : "";
+        document.getElementById('p_nature').value = p ? p.nature : "";
+        document.getElementById('p_lie').value = p ? p.lie : "";
+        document.getElementById('btn_del_proj').style.display = id ? "block" : "none";
         showModal('modalP');
     }
 
@@ -244,57 +315,105 @@
         const id = document.getElementById('edit_proj_id').value;
         const data = { aff: document.getElementById('p_aff').value, cli: document.getElementById('p_cli').value, nature: document.getElementById('p_nature').value, lie: document.getElementById('p_lie').value };
         if(id) { let idx = window.state.projects.findIndex(x => x.id === parseInt(id)); window.state.projects[idx] = { ...window.state.projects[idx], ...data }; }
-        else { window.state.projects.push({ id: Date.now(), ...data, color: `hsl(${Math.random()*360}, 60%, 45%)` }); }
-        saveToFirebase(); hideModal('modalP');
+        else { window.state.projects.push({ id: Date.now(), ...data, color: `hsl(${Math.random()*360}, 65%, 45%)` }); }
+        saveState(); hideModal('modalP');
+    }
+
+    function newTask() {
+        updateSelectors();
+        document.getElementById('edit_task_id').value = "";
+        document.getElementById('t_name').value = "";
+        document.getElementById('t_start').value = formatDateKey(new Date());
+        document.querySelector('input[name="t_location"][value="atelier"]').checked = true;
+        showModal('modalT');
+    }
+
+    function editTask(id) {
+        const t = window.state.tasks.find(x => x.id === id);
+        updateSelectors();
+        document.getElementById('edit_task_id').value = t.id;
+        document.getElementById('t_name').value = t.name;
+        document.getElementById('t_start').value = t.start;
+        document.getElementById('t_dur').value = t.duration;
+        document.getElementById('t_proj_sel').value = t.pId;
+        if(t.location) document.querySelector(`input[name="t_location"][value="${t.location}"]`).checked = true;
+        const sel = document.getElementById('t_staff_sel');
+        Array.from(sel.options).forEach(opt => opt.selected = t.staff.includes(opt.value));
+        document.getElementById('btn_del_task').style.display = "block";
+        showModal('modalT');
+    }
+
+    function saveTask() {
+        const id = document.getElementById('edit_task_id').value;
+        const staff = Array.from(document.getElementById('t_staff_sel').selectedOptions).map(o => o.value);
+        const location = document.querySelector('input[name="t_location"]:checked').value;
+        const taskData = {
+            id: id ? parseInt(id) : Date.now(),
+            pId: parseInt(document.getElementById('t_proj_sel').value),
+            name: document.getElementById('t_name').value || "Tâche",
+            staff, location,
+            start: document.getElementById('t_start').value,
+            duration: parseInt(document.getElementById('t_dur').value),
+            end: addBusinessDays(new Date(document.getElementById('t_start').value), parseInt(document.getElementById('t_dur').value))
+        };
+        if(id) window.state.tasks[window.state.tasks.findIndex(x => x.id === parseInt(id))] = taskData;
+        else window.state.tasks.push(taskData);
+        saveState(); hideModal('modalT');
+    }
+
+    function delTask() { if(confirm("Supprimer ?")) { window.state.tasks = window.state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value)); saveState(); hideModal('modalT'); } }
+
+    function searchProject(event) {
+        const val = document.getElementById('search-affaire').value.toLowerCase();
+        if(!val) searchFilter = null;
+        else searchFilter = window.state.projects.filter(p => p.aff.toLowerCase().includes(val)).map(p => p.id);
+        render();
     }
 
     function render() {
-        const y = viewDate.getFullYear(), m = viewDate.getMonth(), daysInM = new Date(y, m + 1, 0).getDate(), f = getFeries(y);
+        const y = viewDate.getFullYear(), m = viewDate.getMonth(), daysInM = new Date(y, m + 1, 0).getDate(), feries = getFeries(y);
         document.getElementById('date-display').innerText = viewDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'}).toUpperCase();
         
-        let rowDays = `<tr><th class="col-fixed">Affaire / Client / Site</th>`;
+        let rowWeeks = `<tr><th class="col-fixed">Semaines</th>`, rowFerieNames = `<tr><th class="col-fixed">Fériés</th>`, rowDays = `<tr><th class="col-fixed">Affaire / Client / Site</th>`;
+        let weekSpan = 0;
         for(let d=1; d<=daysInM; d++) {
-            let dt = new Date(y, m, d), ds = formatDateKey(dt), isF = f[ds], isW = (dt.getDay()===0||dt.getDay()===6);
-            rowDays += `<th class="col-day ${isW?'weekend':''} ${isF?'ferie':''}">${dt.toLocaleDateString('fr-FR',{weekday:'short'})}<br>${d}</th>`;
+            let dt = new Date(y, m, d), ds = formatDateKey(dt), isFerie = feries[ds], isWeekend = (dt.getDay()===0||dt.getDay()===6), isPont = (isFerie === "PONT");
+            weekSpan++; if (dt.getDay() === 0 || d === daysInM) { rowWeeks += `<th colspan="${weekSpan}" style="font-size:10px; border-bottom:2px solid var(--accent)">S${getWeekNumber(dt)}</th>`; weekSpan = 0; }
+            rowFerieNames += `<th class="col-day ${isPont?'pont':(isFerie?'ferie':'')}">${isFerie?`<div class="ferie-header-name">${isFerie}</div>`:''}</th>`;
+            rowDays += `<th class="col-day ${isWeekend?'weekend':''} ${isPont?'pont':(isFerie?'ferie':'')}"><div style="font-size:9px">${dt.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','')}</div>${d}</th>`;
         }
         
-        let html = `<table><thead>${rowDays}</tr></thead><tbody>`;
-        window.state.projects.forEach(p => {
-            html += `<tr class="row-p" onclick="openModalP(${p.id})">
-                <td class="col-fixed">
-                    <div><b>${p.aff} — ${p.cli}</b></div>
-                    <div style="font-size:10px; color:#666;">${p.nature || ''} | ${p.lie || ''}</div>
-                </td><td colspan="${daysInM}"></td></tr>`;
-            
-            window.state.tasks.filter(t => t.pId === p.id).forEach(t => {
-                html += `<tr><td class="col-fixed" style="padding-left:25px;"><span class="task-name" onclick="event.stopPropagation(); editTask(${t.id})">${t.name}</span></td>`;
-                
-                // Calcul des segments (coupe au niveau des weekends/fériés)
-                let segments = [], curS = null, start = new Date(t.start), end = new Date(t.end);
-                let check = new Date(start);
-                while(check <= end) {
-                    if(isWorkingDay(check, f)) { if(!curS) curS = { s: new Date(check), e: new Date(check) }; else curS.e = new Date(check); }
-                    else if(curS) { segments.push(curS); curS = null; }
-                    check.setDate(check.getDate() + 1);
-                }
-                if(curS) segments.push(curS);
+        let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
+        let projs = window.state.projects;
+        if(searchFilter) projs = projs.filter(p => searchFilter.includes(p.id));
 
+        projs.forEach(p => {
+            html += `<tr class="row-p"><td class="col-fixed" onclick="openModalP(${p.id})"><b>${p.aff} — ${p.cli}</b><div style="font-size:11px; color:#7f8c8d">${p.nature || ''}</div></td><td colspan="${daysInM}"></td></tr>`;
+            window.state.tasks.filter(t => t.pId === p.id).forEach(t => {
+                html += `<tr><td class="col-fixed" style="padding-left:30px;"><span class="task-name" onclick="editTask(${t.id})">${t.name}</span></td>`;
+                let sD = new Date(t.start), eD = new Date(t.end), segments = [], curSeg = null, current = new Date(sD);
+                while (current <= eD) {
+                    if (isWorkingDay(current, feries)) { if (!curSeg) curSeg = { start: new Date(current), end: new Date(current) }; else curSeg.end = new Date(current); }
+                    else if (curSeg) { segments.push(curSeg); curSeg = null; }
+                    current.setDate(current.getDate() + 1);
+                }
+                if (curSeg) segments.push(curSeg);
                 for(let d=1; d<=daysInM; d++) {
-                    let cur = new Date(y, m, d), content = "", isW = (cur.getDay()===0||cur.getDay()===6), isF = f[formatDateKey(cur)];
+                    let cur = new Date(y, m, d), content = "", ds = formatDateKey(cur), isF = feries[ds], isW = (cur.getDay()===0||cur.getDay()===6), isP = (isF==="PONT");
                     segments.forEach((seg, idx) => {
-                        if(cur.toDateString() === seg.s.toDateString()) {
-                            let w = (Math.ceil((seg.e - seg.s) / 86400000) + 1) * 50;
-                            let sClass = t.location === 'client' ? 'staff-client' : 'staff-atelier';
-                            content = `<div class="task-bar ${selectedTaskId===t.id?'selected':''}" style="background:${p.color}; width:${w-4}px;" onclick="event.stopPropagation(); selectedTaskId=${t.id}; render();" ondblclick="onTaskDoubleClick(${t.id}, event)">
-                                <div class="resize-handle left" onmousedown="startResize(${t.id},'left',event)"></div>
-                                <div style="display:flex; flex-wrap:wrap; gap:2px; pointer-events:none; padding-right:10px; padding-left:10px;">
-                                    ${idx === 0 ? (t.staff||[]).map(s => `<span class="staff-tag ${sClass}">${s}</span>`).join('') : ''}
-                                </div>
-                                <div class="resize-handle right" onmousedown="startResize(${t.id},'right',event)"></div>
+                        if (cur.toDateString() === seg.start.toDateString()) {
+                            let width = (Math.ceil((seg.end - seg.start) / 86400000) + 1) * 50;
+                            let locClass = t.location === 'client' ? 'loc-client' : 'loc-atelier';
+                            let locLabel = t.location === 'client' ? 'Client' : 'Atelier';
+                            content = `<div class="task-bar ${selectedTaskId===t.id?'selected':''}" style="background:${p.color}; width:${width-4}px;" onclick="selectTask(${t.id}, event)">
+                                ${idx===0?`<div class="loc-tag ${locClass}">${locLabel}</div>`:''}
+                                <div style="display:flex; flex-wrap:wrap; gap:2px">${idx===0?(t.staff||[]).map(s=>`<span class="staff-tag">${s}</span>`).join(''):''}</div>
+                                ${idx===0?`<div class="resize-handle" style="left:0" onmousedown="startResize(${t.id},'left',event)"></div>`:''}
+                                ${idx===segments.length-1?`<div class="resize-handle" style="right:0" onmousedown="startResize(${t.id},'right',event)"></div>`:''}
                             </div>`;
                         }
                     });
-                    html += `<td class="col-day ${isW?'weekend':''} ${isF?'ferie':''}">${content}</td>`;
+                    html += `<td class="col-day ${isW?'weekend':''} ${isP?'pont':(isF?'ferie':'')}">${content}</td>`;
                 }
                 html += `</tr>`;
             });
@@ -305,10 +424,8 @@
     function showModal(id) { updateSelectors(); document.getElementById(id).style.display = 'flex'; }
     function hideModal(id) { document.getElementById(id).style.display = 'none'; }
     function changeMonth(n) { viewDate.setMonth(viewDate.getMonth() + n); render(); }
-    function editTask(id) { const t = window.state.tasks.find(x => x.id === id); updateSelectors(); document.getElementById('edit_task_id').value = t.id; document.getElementById('t_name').value = t.name; document.getElementById('t_start').value = t.start; document.getElementById('t_dur').value = t.duration; document.getElementById('t_proj_sel').value = t.pId; showModal('modalT'); }
-    function updateSelectors() { document.getElementById('t_proj_sel').innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff}</option>`).join(''); document.getElementById('staff-list').innerHTML = window.state.staff.map(s => `<div>${s}</div>`).join(''); }
-
     document.addEventListener('click', () => { if(!isResizing) { selectedTaskId = null; render(); } });
+
     render();
 </script>
 </body>
