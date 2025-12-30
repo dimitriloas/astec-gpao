@@ -179,7 +179,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    // REMPLACER PAR VOTRE CONFIGURATION FIREBASE ICI
+    // CONFIGURATION FIREBASE
     const firebaseConfig = {
         apiKey: "AIzaSyAGziDYYX7R-3MV5UX3UO4xy8iwWdOkgI8",
         authDomain: "astec-gpao.firebaseapp.com",
@@ -188,13 +188,12 @@
         storageBucket: "astec-gpao.firebasestorage.app",
         messagingSenderId: "1042124006828",
         appId: "1:1042124006828:web:4ea7c467137cf4886b4609"
-};
+    };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     const dbRef = ref(db, 'astec_gpao_data');
 
-    // Écoute en temps réel des changements dans Firebase
     onValue(dbRef, (snapshot) => {
         const data = snapshot.val();
         if (data) {
@@ -202,18 +201,16 @@
             if (!window.state.projects) window.state.projects = [];
             if (!window.state.tasks) window.state.tasks = [];
             if (!window.state.staff) window.state.staff = [];
-            render(); // Redessine le planning avec les nouvelles données
+            render();
         }
     });
 
-    // Fonction globale pour sauvegarder vers Firebase
     window.saveToFirebase = function() {
         set(dbRef, window.state);
     };
 </script>
 
 <script>
-    // Initialisation de l'état (vide au départ, Firebase remplira les données)
     window.state = { projects: [], tasks: [], staff: [] };
     let viewDate = new Date(); viewDate.setDate(1);
     let selectedTaskId = null;
@@ -244,7 +241,6 @@
         };
     }
 
-    // NOUVELLE FONCTION DE SAUVEGARDE (Firebase au lieu de LocalStorage)
     function saveState() {
         if (window.saveToFirebase) {
             window.saveToFirebase();
@@ -286,13 +282,11 @@
         return day !== 0 && day !== 6 && !feries[key];
     }
 
-    // Nouvelle fonction pour ajouter/retirer des jours ouvrés à une date
     function addWorkingDays(date, delta, feries) {
         let d = new Date(date);
         let count = 0;
         const direction = delta > 0 ? 1 : -1;
         const target = Math.abs(delta);
-        
         while (count < target) {
             d.setDate(d.getDate() + direction);
             if (isWorkingDay(d, feries)) count++;
@@ -349,12 +343,8 @@
         isResizing = true;
         const task = window.state.tasks.find(t => t.id === taskId);
         resizeData = { 
-            taskId, 
-            direction, 
-            startX: event.pageX, 
-            originalStart: new Date(task.start), 
-            originalEnd: new Date(task.end),
-            lastDelta: 0
+            taskId, direction, startX: event.pageX, 
+            originalStart: new Date(task.start), originalEnd: new Date(task.end), lastDelta: 0
         };
         document.addEventListener('mousemove', handleResize);
         document.addEventListener('mouseup', endResize);
@@ -366,27 +356,20 @@
         if (!isResizing || !resizeData) return;
         const deltaX = event.pageX - resizeData.startX;
         const daysDelta = Math.round(deltaX / 50);
-        
         if (daysDelta === resizeData.lastDelta) return;
         resizeData.lastDelta = daysDelta;
-        
         const task = window.state.tasks.find(t => t.id === resizeData.taskId);
         const y = resizeData.originalStart.getFullYear();
         const feries = getFeries(y);
-        
         let newStart = new Date(resizeData.originalStart);
         let newEnd = new Date(resizeData.originalEnd);
-        
         if (resizeData.direction === 'left') {
-            // Déplacer le début
             newStart = addWorkingDays(resizeData.originalStart, daysDelta, feries);
             if (newStart >= newEnd) return;
         } else {
-            // Déplacer la fin
             newEnd = addWorkingDays(resizeData.originalEnd, daysDelta, feries);
             if (newEnd <= newStart) return;
         }
-        
         task.start = formatDateKey(newStart);
         task.end = formatDateKey(newEnd);
         task.duration = countBusinessDays(newStart, newEnd);
@@ -395,21 +378,23 @@
 
     function endResize() { 
         if (isResizing) { 
-            isResizing = false; 
-            resizeData = null; 
+            isResizing = false; resizeData = null; 
             document.removeEventListener('mousemove', handleResize); 
             document.removeEventListener('mouseup', endResize); 
-            document.body.style.cursor = ''; 
-            document.body.style.userSelect = ''; 
+            document.body.style.cursor = ''; document.body.style.userSelect = ''; 
             saveState(); 
         } 
     }
 
+    // CORRECTION ICI : Ajout de la mise à jour visuelle après l'ajout
     function addStaff() { 
         let n = document.getElementById('new_staff').value.trim(); 
         if(n && !window.state.staff.includes(n)) { 
-            window.state.staff.push(n); window.state.staff.sort(); saveState(); 
+            window.state.staff.push(n); 
+            window.state.staff.sort(); 
+            saveState(); 
             document.getElementById('new_staff').value=''; 
+            updateSelectors(); // Met à jour les listes et l'affichage du personnel
         } 
     }
 
@@ -421,22 +406,30 @@
             if (idx !== -1) window.state.staff[idx] = newName;
             window.state.tasks.forEach(t => { if (t.staff && t.staff.includes(oldName)) t.staff = t.staff.map(s => s === oldName ? newName : s); });
             saveState();
+            updateSelectors();
         }
     }
 
     function removeStaffFromList(name) {
-        if (confirm(`Retirer "${name}" de la liste ?`)) { window.state.staff = window.state.staff.filter(s => s !== name); saveState(); }
+        if (confirm(`Retirer "${name}" de la liste ?`)) { 
+            window.state.staff = window.state.staff.filter(s => s !== name); 
+            saveState(); 
+            updateSelectors();
+        }
     }
 
     function updateSelectors() {
         const projSel = document.getElementById('t_proj_sel');
-        projSel.innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
+        if(projSel) projSel.innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
         
         const staffSel = document.getElementById('t_staff_sel');
-        staffSel.innerHTML = window.state.staff.map(s => `<option value="${s}">${s}</option>`).join('');
+        if(staffSel) staffSel.innerHTML = window.state.staff.map(s => `<option value="${s}">${s}</option>`).join('');
         
-        document.getElementById('print_proj_sel').innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} — ${p.cli}</option>`).join('');
-        document.getElementById('staff-list').innerHTML = window.state.staff.map(s => `<div class="staff-item"><span>${s}</span><div class="staff-actions"><button class="btn-small btn-edit" onclick="renameStaff('${s}')">Modifier</button><button class="btn-small btn-delete" onclick="removeStaffFromList('${s}')">Retirer</button></div></div>`).join('');
+        const printSel = document.getElementById('print_proj_sel');
+        if(printSel) printSel.innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} — ${p.cli}</option>`).join('');
+        
+        const staffList = document.getElementById('staff-list');
+        if(staffList) staffList.innerHTML = window.state.staff.map(s => `<div class="staff-item"><span>${s}</span><div class="staff-actions"><button class="btn-small btn-edit" onclick="renameStaff('${s}')">Modifier</button><button class="btn-small btn-delete" onclick="removeStaffFromList('${s}')">Retirer</button></div></div>`).join('');
     }
 
     function openModalP(id = null) {
@@ -477,17 +470,10 @@
         document.getElementById('t_start').value = formatDateKey(new Date());
         document.getElementById('t_dur').value = "1";
         document.getElementById('btn_del_task').style.display = "none";
-        
-        // Sélectionner le premier projet par défaut
         const projSel = document.getElementById('t_proj_sel');
-        if (projSel.options.length > 0) {
-            projSel.selectedIndex = 0;
-        }
-        
-        // Désélectionner tout le personnel
+        if (projSel.options.length > 0) projSel.selectedIndex = 0;
         const staffSel = document.getElementById('t_staff_sel');
         Array.from(staffSel.options).forEach(opt => opt.selected = false);
-        
         showModal('modalT');
     }
 
@@ -500,7 +486,6 @@
         document.getElementById('t_start').value = t.start;
         document.getElementById('t_dur').value = t.duration || 1;
         document.getElementById('btn_del_task').style.display = "block";
-        
         document.getElementById('t_proj_sel').value = t.pId;
         const sel = document.getElementById('t_staff_sel');
         Array.from(sel.options).forEach(opt => opt.selected = t.staff && t.staff.includes(opt.value));
@@ -512,7 +497,6 @@
         const staff = Array.from(document.getElementById('t_staff_sel').selectedOptions).map(o => o.value);
         if(!document.getElementById('t_start').value) return alert("Date de début requise");
         if(staff.length === 0) return alert("Veuillez sélectionner au moins un membre du personnel");
-        
         const taskData = {
             id: id ? parseInt(id) : Date.now(),
             pId: parseInt(document.getElementById('t_proj_sel').value),
@@ -533,124 +517,55 @@
 
     function searchProject(event) {
         const searchValue = document.getElementById('search-affaire').value.trim().toLowerCase();
-        if (searchValue === '') {
-            clearSearch();
-            return;
-        }
-        
-        // Rechercher le projet par N° d'affaire
-        const foundProjects = window.state.projects.filter(p => 
-            p.aff.toLowerCase().includes(searchValue)
-        );
-        
-        if (foundProjects.length > 0) {
-            searchFilter = foundProjects.map(p => p.id);
-            document.getElementById('clear-search-btn').style.display = 'block';
-            render();
-        } else {
-            searchFilter = [];
-            document.getElementById('clear-search-btn').style.display = 'block';
-            render();
-        }
+        if (searchValue === '') { clearSearch(); return; }
+        const foundProjects = window.state.projects.filter(p => p.aff.toLowerCase().includes(searchValue));
+        if (foundProjects.length > 0) { searchFilter = foundProjects.map(p => p.id); document.getElementById('clear-search-btn').style.display = 'block'; render(); } 
+        else { searchFilter = []; document.getElementById('clear-search-btn').style.display = 'block'; render(); }
     }
 
-    function clearSearch() {
-        searchFilter = null;
-        document.getElementById('search-affaire').value = '';
-        document.getElementById('clear-search-btn').style.display = 'none';
-        render();
-    }
+    function clearSearch() { searchFilter = null; document.getElementById('search-affaire').value = ''; document.getElementById('clear-search-btn').style.display = 'none'; render(); }
 
     function printPDF() {
         const projId = parseInt(document.getElementById('print_proj_sel').value);
         const startDateStr = document.getElementById('print_start_date').value;
         const showStaff = document.getElementById('print_show_staff').checked;
-        
-        if (!startDateStr) {
-            alert("Veuillez sélectionner une date de début");
-            return;
-        }
-        
+        if (!startDateStr) return alert("Veuillez sélectionner une date de début");
         const project = window.state.projects.find(p => p.id === projId);
-        if (!project) {
-            alert("Projet introuvable");
-            return;
-        }
-        
-        // Sauvegarder l'état actuel
+        if (!project) return alert("Projet introuvable");
         const originalContent = document.getElementById('gantt-table').innerHTML;
-        const originalDisplay = document.getElementById('date-display').innerText;
-        
-        // Générer la vue d'impression
         const startDate = new Date(startDateStr);
-        const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 27); // 4 semaines = 28 jours
-        
         const y = startDate.getFullYear();
         const feries = getFeries(y);
-        
-        // Construire l'en-tête d'impression
         document.getElementById('print-header').innerText = `${project.aff} — ${project.cli} | ${project.nature} | ${project.lie}`;
-        
-        // Générer les colonnes pour 28 jours
         let rowWeeks = `<tr><th class="col-fixed" style="background:#f8f9fa">Semaines</th>`,
             rowFerieNames = `<tr><th class="col-fixed" style="background:#f8f9fa">Jours Fériés</th>`,
             rowDays = `<tr><th class="col-fixed">Affaire / Client / Site</th>`;
-        
         let weekSpan = 0;
-        let dayCount = 0;
         for(let i=0; i<28; i++) {
-            let dt = new Date(startDate);
-            dt.setDate(dt.getDate() + i);
+            let dt = new Date(startDate); dt.setDate(dt.getDate() + i);
             let ds = formatDateKey(dt), isFerie = feries[ds], isWeekend = (dt.getDay()===0||dt.getDay()===6);
-            dayCount++;
             weekSpan++;
-            
-            if (dt.getDay() === 0 || i === 27) { 
-                rowWeeks += `<th colspan="${weekSpan}" style="background:#f8f9fa; font-size:0.75em; border-bottom: 2px solid var(--accent);">Sem. ${getWeekNumber(dt)}</th>`; 
-                weekSpan = 0; 
-            }
+            if (dt.getDay() === 0 || i === 27) { rowWeeks += `<th colspan="${weekSpan}" style="background:#f8f9fa; font-size:0.75em; border-bottom: 2px solid var(--accent);">Sem. ${getWeekNumber(dt)}</th>`; weekSpan = 0; }
             rowFerieNames += `<th class="col-day ${isFerie ? 'ferie' : ''}">${isFerie ? `<div class="ferie-header-name">${isFerie}</div>` : ''}</th>`;
             rowDays += `<th class="col-day ${isWeekend ? 'weekend' : ''} ${isFerie ? 'ferie' : ''}"><div style="font-size:0.8em;">${dt.toLocaleDateString('fr-FR', {weekday:'short'}).replace('.','')}</div><div>${dt.getDate()}</div></th>`;
         }
-        
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
-        html += `<tr class="row-p"><td class="col-fixed">
-            <b>${project.aff} — ${project.cli}</b>
-            <div style="font-size:0.85em; color:#7f8c8d; margin-top:2px;">${project.nature || ''}</div>
-            <div style="font-size:0.9em; color:#95a5a6; margin-top:3px;">${project.lie}</div>
-        </td><td colspan="${dayCount}"></td></tr>`;
-        
+        html += `<tr class="row-p"><td class="col-fixed"><b>${project.aff} — ${project.cli}</b><div style="font-size:0.85em; color:#7f8c8d; margin-top:2px;">${project.nature || ''}</div><div style="font-size:0.9em; color:#95a5a6; margin-top:3px;">${project.lie}</div></td><td colspan="28"></td></tr>`;
         window.state.tasks.filter(t => t.pId === projId).forEach(t => {
             html += `<tr><td class="col-fixed" style="padding-left:30px;">${t.name}</td>`;
-            let sD = new Date(t.start), eD = new Date(t.end);
-            
-            // Création des segments
-            let segments = [], currentSegment = null, current = new Date(sD);
+            let sD = new Date(t.start), eD = new Date(t.end), segments = [], curSeg = null, current = new Date(sD);
             while (current <= eD) {
-                if (isWorkingDay(current, feries)) {
-                    if (!currentSegment) currentSegment = { start: new Date(current), end: new Date(current) };
-                    else currentSegment.end = new Date(current);
-                } else if (currentSegment) { 
-                    segments.push(currentSegment); 
-                    currentSegment = null; 
-                }
+                if (isWorkingDay(current, feries)) { if (!curSeg) curSeg = { start: new Date(current), end: new Date(current) }; else curSeg.end = new Date(current); }
+                else if (curSeg) { segments.push(curSeg); curSeg = null; }
                 current.setDate(current.getDate() + 1);
             }
-            if (currentSegment) segments.push(currentSegment);
-            
+            if (curSeg) segments.push(curSeg);
             for(let i=0; i<28; i++) {
-                let cur = new Date(startDate);
-                cur.setDate(cur.getDate() + i);
-                let content = "";
-                
+                let cur = new Date(startDate); cur.setDate(cur.getDate() + i); let content = "";
                 segments.forEach((seg, idx) => {
                     if (cur.toDateString() === seg.start.toDateString()) {
                         let width = (Math.ceil((seg.end - seg.start) / 86400000) + 1) * 50;
-                        let staffDisplay = '';
-                        if (showStaff && idx === 0) {
-                            staffDisplay = (t.staff||[]).map(s=>`<div class="staff-tag">${s}</div>`).join('');
-                        }
+                        let staffDisplay = (showStaff && idx === 0) ? (t.staff||[]).map(s=>`<div class="staff-tag">${s}</div>`).join('') : '';
                         content = `<div class="task-bar" style="background:${project.color}; width:${width-4}px;">${staffDisplay}</div>`;
                     }
                 });
@@ -658,29 +573,17 @@
             }
             html += `</tr>`;
         });
-        
         document.getElementById('gantt-table').innerHTML = html + `</tbody></table>`;
-        
-        // Lancer l'impression
         hideModal('modalPrint');
-        setTimeout(() => {
-            window.print();
-            // Restaurer la vue après l'impression
-            setTimeout(() => {
-                document.getElementById('gantt-table').innerHTML = originalContent;
-                document.getElementById('print-header').innerText = '';
-            }, 500);
-        }, 100);
+        setTimeout(() => { window.print(); setTimeout(() => { document.getElementById('gantt-table').innerHTML = originalContent; document.getElementById('print-header').innerText = ''; }, 500); }, 100);
     }
 
     function render() {
         const y = viewDate.getFullYear(), m = viewDate.getMonth(), daysInM = new Date(y, m + 1, 0).getDate(), feries = getFeries(y);
         document.getElementById('date-display').innerText = viewDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'}).toUpperCase();
-
         let rowWeeks = `<tr><th class="col-fixed" style="background:#f8f9fa">Semaines</th>`,
             rowFerieNames = `<tr><th class="col-fixed" style="background:#f8f9fa">Jours Fériés</th>`,
             rowDays = `<tr><th class="col-fixed">Affaire / Client / Site</th>`;
-
         let weekSpan = 0;
         for(let d=1; d<=daysInM; d++) {
             let dt = new Date(y, m, d), ds = formatDateKey(dt), isFerie = feries[ds], isWeekend = (dt.getDay()===0||dt.getDay()===6);
@@ -689,65 +592,22 @@
             rowFerieNames += `<th class="col-day ${isFerie ? 'ferie' : ''}">${isFerie ? `<div class="ferie-header-name">${isFerie}</div>` : ''}</th>`;
             rowDays += `<th class="col-day ${isWeekend ? 'weekend' : ''} ${isFerie ? 'ferie' : ''}"><div style="font-size:0.8em;">${dt.toLocaleDateString('fr-FR', {weekday:'short'}).replace('.','')}</div><div>${d}</div></th>`;
         }
-
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
-        
-        // Calculer les limites du mois affiché
-        const monthStart = new Date(y, m, 1);
-        const monthEnd = new Date(y, m + 1, 0);
-        
-        // Filtrer uniquement les projets qui ont au moins une tâche dans le mois affiché
-        let projectsWithTasks = window.state.projects.filter(p => 
-            window.state.tasks.some(t => {
-                if (t.pId !== p.id) return false;
-                const taskStart = new Date(t.start);
-                const taskEnd = new Date(t.end);
-                // Vérifier si la tâche chevauche le mois affiché
-                return taskStart <= monthEnd && taskEnd >= monthStart;
-            })
-        );
-        
-        // Appliquer le filtre de recherche si présent
-        if (searchFilter !== null) {
-            if (searchFilter.length === 0) {
-                // Aucun projet trouvé
-                projectsWithTasks = [];
-            } else {
-                projectsWithTasks = projectsWithTasks.filter(p => searchFilter.includes(p.id));
-            }
-        }
-        
-        // Message si aucun projet trouvé
-        if (searchFilter !== null && projectsWithTasks.length === 0) {
-            html += `<tr><td colspan="${daysInM + 1}" style="text-align:center; padding:40px; color:#7f8c8d; font-style:italic;">Aucun projet trouvé avec ce N° d'affaire</td></tr>`;
-        }
-        
-        projectsWithTasks.forEach(p => {
-            html += `<tr class="row-p"><td class="col-fixed">
-                <span class="proj-name" onclick="openModalP(${p.id})">
-                    <b>${p.aff} — ${p.cli}</b>
-                    <div style="font-size:0.85em; color:#7f8c8d; margin-top:2px;">${p.nature || ''}</div>
-                </span>
-                <div style="font-size:0.9em; color:#95a5a6; margin-top:3px;">${p.lie}</div>
-            </td><td colspan="${daysInM}"></td></tr>`;
+        const mStart = new Date(y, m, 1), mEnd = new Date(y, m + 1, 0);
+        let projs = window.state.projects.filter(p => window.state.tasks.some(t => t.pId === p.id && new Date(t.start) <= mEnd && new Date(t.end) >= mStart));
+        if (searchFilter !== null) projs = searchFilter.length === 0 ? [] : projs.filter(p => searchFilter.includes(p.id));
+        if (searchFilter !== null && projs.length === 0) html += `<tr><td colspan="${daysInM + 1}" style="text-align:center; padding:40px; color:#7f8c8d; font-style:italic;">Aucun projet trouvé avec ce N° d'affaire</td></tr>`;
+        projs.forEach(p => {
+            html += `<tr class="row-p"><td class="col-fixed"><span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} — ${p.cli}</b><div style="font-size:0.85em; color:#7f8c8d; margin-top:2px;">${p.nature || ''}</div></span><div style="font-size:0.9em; color:#95a5a6; margin-top:3px;">${p.lie}</div></td><td colspan="${daysInM}"></td></tr>`;
             window.state.tasks.filter(t => t.pId === p.id).forEach(t => {
                 html += `<tr><td class="col-fixed" style="padding-left:30px;"><span class="task-name" onclick="editTask(${t.id})">${t.name}</span></td>`;
-                let sD = new Date(t.start), eD = new Date(t.end);
-                
-                // Création des segments basés sur les jours ouvrés
-                let segments = [], currentSegment = null, current = new Date(sD);
+                let sD = new Date(t.start), eD = new Date(t.end), segments = [], curSeg = null, current = new Date(sD);
                 while (current <= eD) {
-                    if (isWorkingDay(current, feries)) {
-                        if (!currentSegment) currentSegment = { start: new Date(current), end: new Date(current) };
-                        else currentSegment.end = new Date(current);
-                    } else if (currentSegment) { 
-                        segments.push(currentSegment); 
-                        currentSegment = null; 
-                    }
+                    if (isWorkingDay(current, feries)) { if (!curSeg) curSeg = { start: new Date(current), end: new Date(current) }; else curSeg.end = new Date(current); }
+                    else if (curSeg) { segments.push(curSeg); curSeg = null; }
                     current.setDate(current.getDate() + 1);
                 }
-                if (currentSegment) segments.push(currentSegment);
-                
+                if (curSeg) segments.push(curSeg);
                 for(let d=1; d<=daysInM; d++) {
                     let cur = new Date(y, m, d), content = "";
                     segments.forEach((seg, idx) => {
@@ -765,10 +625,7 @@
     }
 
     document.addEventListener('click', () => { if (!isResizing) { selectedTaskId = null; render(); } });
-    function showModal(id) { 
-        updateSelectors(); 
-        document.getElementById(id).style.display = 'flex'; 
-    }
+    function showModal(id) { updateSelectors(); document.getElementById(id).style.display = 'flex'; }
     function hideModal(id) { document.getElementById(id).style.display = 'none'; }
     function changeMonth(n) { viewDate.setMonth(viewDate.getMonth() + n); render(); }
 
