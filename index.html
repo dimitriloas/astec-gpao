@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ASTEC GPAO - Gestion Planning</title>
+    <title>ASTEC GPAO - Planning Adaptatif</title>
     <style>
         :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60; --weekend: #e8f5e9; --ferie: #fce4ec; --pont: #fff9c4; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 20px; background: #f4f7f6; }
@@ -10,7 +10,7 @@
         .header { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 15px; }
 
-        button { padding: 10px 15px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: 600; border:none; }
+        button { padding: 10px 15px; cursor: pointer; border: none; border-radius: 4px; color: white; font-weight: 600; }
         .btn-blue { background: var(--accent); }
         .btn-green { background: var(--success); }
         .btn-red { background: var(--danger); }
@@ -26,42 +26,46 @@
 
         /* Table & Gantt */
         .gantt-container { background: white; padding: 15px; border-radius: 8px; overflow-x: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        table { border-collapse: collapse; width: max-content; min-width: 100%; }
-        th, td { border: 1px solid #ddd; padding: 0; text-align: center; vertical-align: middle; }
+        table { border-collapse: collapse; width: max-content; min-width: 100%; position: relative; }
+        th, td { border: 1px solid #ddd; padding: 0; text-align: center; vertical-align: middle; position: relative; }
 
-        .col-day { width: 50px; min-width: 50px; height: 40px; }
+        .col-day { width: 50px; min-width: 50px; height: 45px; }
         .weekend { background: var(--weekend) !important; }
         .ferie { background: var(--ferie) !important; }
         .pont { background: var(--pont) !important; }
 
-        .col-fixed { position: sticky; left: 0; background: #fff; width: 350px; text-align: left; z-index: 20; border-right: 4px solid var(--primary); padding: 10px 15px; }
-        .row-p { background: #f8f9fa; font-weight: bold; }
+        .col-fixed { position: sticky; left: 0; background: #fff; width: 350px; text-align: left; z-index: 30; border-right: 4px solid var(--primary); padding: 8px 15px; }
+        .row-p { background: #f1f3f5; font-weight: bold; cursor: pointer; }
+        .task-name { cursor: pointer; color: var(--accent); text-decoration: underline; }
 
         /* Barre de tâche adaptative */
         .task-bar {
-            position: relative; margin: 4px auto; border-radius: 4px;
-            color: white; display: flex; flex-wrap: wrap; gap: 3px; padding: 6px;
+            position: absolute; top: 4px; left: 2px; height: calc(100% - 8px);
+            z-index: 10; border-radius: 4px; color: white;
+            display: flex; flex-wrap: wrap; align-content: flex-start; gap: 3px; padding: 4px;
             font-size: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-            box-sizing: border-box; cursor: pointer; min-height: 30px; width: calc(100% - 4px);
+            box-sizing: border-box; cursor: pointer;
         }
-        .task-bar.selected { outline: 3px solid rgba(52, 152, 219, 0.7); z-index: 15; }
+        .task-bar.selected { outline: 3px solid rgba(52, 152, 219, 0.8); z-index: 20; }
 
-        .staff-tag { padding: 2px 5px; border-radius: 3px; white-space: nowrap; color: white; border: 1px solid rgba(255,255,255,0.2); }
+        .staff-tag { padding: 1px 4px; border-radius: 2px; white-space: nowrap; color: white; border: 1px solid rgba(255,255,255,0.3); font-size: 9px; }
         .staff-atelier { background: #7f8c8d !important; } 
         .staff-client { background: #e67e22 !important; }
 
-        /* Quick Edit Pop-up */
+        /* Resize handles */
+        .resize-handle { position: absolute; top: 0; width: 8px; height: 100%; cursor: ew-resize; z-index: 25; }
+        .resize-handle.left { left: 0; }
+        .resize-handle.right { right: 0; }
+
+        /* Pop-up Double Clic */
         .quick-edit-modal { 
             position: absolute; background: white; border-radius: 8px; padding: 15px; 
-            box-shadow: 0 8px 25px rgba(0,0,0,0.3); z-index: 1000; min-width: 250px; border: 1px solid #ccc;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3); z-index: 2000; min-width: 250px; border: 1px solid #ccc;
         }
-        .quick-edit-modal h4 { margin: 0 0 10px 0; color: var(--primary); border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        .quick-section { margin-bottom: 10px; }
-        .quick-section label { display: block; font-weight: bold; font-size: 11px; margin-bottom: 5px; color: #666; }
 
-        .modal { display: none; position: fixed; z-index: 100; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
+        .modal { display: none; position: fixed; z-index: 1000; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
         .modal-content { background: white; padding: 25px; border-radius: 8px; width: 400px; display: flex; flex-direction: column; gap: 12px; }
-        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -76,7 +80,7 @@
         <button class="btn-blue" onclick="newTask()">+ Tâche</button>
         <button style="background: #9b59b6;" onclick="showModal('modalPerso')">👥 Paramètres</button>
         <div style="margin-left: auto;">
-            <input type="text" id="search-affaire" placeholder="🔍 N° Affaire..." onkeyup="searchProject(event)">
+            <input type="text" id="search-affaire" placeholder="🔍 N° Affaire..." onkeyup="searchProject()">
         </div>
     </div>
 </div>
@@ -86,8 +90,8 @@
     <div class="legend-item"><div class="box" style="background: var(--ferie);"></div> Férié</div>
     <div class="legend-item"><div class="box" style="background: var(--pont);"></div> Pont</div>
     <div style="width:20px"></div>
-    <div class="legend-item"><div class="box staff-atelier" style="border:none"></div> Personnel Atelier (Gris)</div>
-    <div class="legend-item"><div class="box staff-client" style="border:none"></div> Personnel Site (Orange)</div>
+    <div class="legend-item"><div class="box staff-atelier"></div> Atelier (Gris)</div>
+    <div class="legend-item"><div class="box staff-client"></div> Site (Orange)</div>
 </div>
 
 <div class="gantt-container" id="gantt-table"></div>
@@ -98,6 +102,7 @@
     <input type="text" id="p_aff" placeholder="N° Affaire">
     <input type="text" id="p_cli" placeholder="Client">
     <button class="btn-green" onclick="saveProject()">Enregistrer</button>
+    <button class="btn-red" onclick="delProject()">Supprimer</button>
     <button class="btn-grey" onclick="hideModal('modalP')">Fermer</button>
 </div></div>
 
@@ -107,17 +112,17 @@
     <select id="t_proj_sel"></select>
     <input type="text" id="t_name" placeholder="Désignation">
     <div style="display:flex; gap:10px;">
-        <input type="date" id="t_start" style="flex:1">
-        <input type="number" id="t_dur" value="1" min="1" style="width:60px">
+        <input type="date" id="t_start">
+        <input type="number" id="t_dur" value="1" min="1" style="width:70px">
     </div>
     <button class="btn-blue" onclick="saveTask()">Enregistrer</button>
-    <button class="btn-red" onclick="delTask()">Supprimer</button>
+    <button id="btn_del_task" class="btn-red" onclick="delTask()">Supprimer</button>
     <button class="btn-grey" onclick="hideModal('modalT')">Annuler</button>
 </div></div>
 
 <div id="modalPerso" class="modal"><div class="modal-content">
     <h3>Configuration</h3>
-    <div id="staff-list" style="max-height: 100px; overflow-y: auto; border: 1px solid #eee; margin-bottom:5px;"></div>
+    <div id="staff-list" style="max-height: 100px; overflow-y: auto; border: 1px solid #eee;"></div>
     <div style="display:flex; gap:5px;"><input type="text" id="new_staff" placeholder="Nom" style="flex:1"><button class="btn-green" onclick="addStaff()">+</button></div>
     <hr>
     <div id="pont-list" style="max-height: 80px; overflow-y: auto; border: 1px solid #eee;"></div>
@@ -162,6 +167,8 @@
     window.state = { projects: [], tasks: [], staff: [], ponts: [] };
     let viewDate = new Date(); viewDate.setDate(1);
     let selectedTaskId = null;
+    let isResizing = false;
+    let resizeData = null;
     let quickEditModal = null;
     let searchFilter = null;
 
@@ -189,8 +196,6 @@
         return f;
     }
 
-    function saveState() { if (window.saveToFirebase) window.saveToFirebase(); }
-
     function isWorkingDay(date, feries) {
         const day = date.getDay();
         return day !== 0 && day !== 6 && !feries[formatDateKey(date)];
@@ -207,42 +212,57 @@
         return formatDateKey(d);
     }
 
-    // GESTION DOUBLE CLIC
+    function countBusinessDays(start, end) {
+        let count = 0, current = new Date(start), endDate = new Date(end);
+        const feries = getFeries(current.getFullYear());
+        while (current <= endDate) {
+            if (isWorkingDay(current, feries)) count++;
+            current.setDate(current.getDate() + 1);
+        }
+        return count;
+    }
+
+    function addWorkingDays(date, delta, feries) {
+        let d = new Date(date);
+        let count = 0;
+        const direction = delta > 0 ? 1 : -1;
+        const target = Math.abs(delta);
+        while (count < target) {
+            d.setDate(d.getDate() + direction);
+            if (isWorkingDay(d, feries)) count++;
+        }
+        return d;
+    }
+
+    // ACTIONS CLIC
+    function selectTask(taskId, event) {
+        event.stopPropagation();
+        closeQuickEdit();
+        selectedTaskId = (selectedTaskId === taskId) ? null : taskId;
+        render();
+    }
+
     function onTaskDoubleClick(taskId, event) {
         event.stopPropagation();
         closeQuickEdit();
         const task = window.state.tasks.find(t => t.id === taskId);
-        if (!task) return;
-
+        
         const modal = document.createElement('div');
         modal.className = 'quick-edit-modal';
         modal.style.left = Math.min(event.pageX, window.innerWidth - 280) + 'px';
         modal.style.top = event.pageY + 'px';
 
-        let html = `<h4>Modifier la tâche</h4>`;
+        let html = `<h4>${task.name}</h4>`;
+        html += `<div style="margin-bottom:10px;"><label style="font-size:11px; font-weight:bold;">Lieu :</label><br>
+            <input type="radio" name="q_loc" value="atelier" ${task.location==='atelier'?'checked':''} onchange="updateQuick(${taskId},'location','atelier')"> Atelier 
+            <input type="radio" name="q_loc" value="client" ${task.location==='client'?'checked':''} onchange="updateQuick(${taskId},'location','client')"> Site</div>`;
         
-        // Section Lieu
-        html += `<div class="quick-section">
-            <label>Lieu d'exécution :</label>
-            <div style="display:flex; gap:10px;">
-                <label style="font-size:11px;"><input type="radio" name="q_loc" value="atelier" ${task.location==='atelier'?'checked':''} onchange="updateQuickTask(${taskId}, 'location', 'atelier')"> Atelier</label>
-                <label style="font-size:11px;"><input type="radio" name="q_loc" value="client" ${task.location==='client'?'checked':''} onchange="updateQuickTask(${taskId}, 'location', 'client')"> Site Client</label>
-            </div>
-        </div>`;
-
-        // Section Personnel
-        html += `<div class="quick-section">
-            <label>Personnel affecté :</label>
-            <div style="max-height:150px; overflow-y:auto; border:1px solid #eee; padding:5px;">`;
+        html += `<label style="font-size:11px; font-weight:bold;">Personnel :</label><div style="max-height:120px; overflow-y:auto; border:1px solid #ddd; padding:5px; margin-top:5px;">`;
         window.state.staff.forEach(s => {
             const checked = (task.staff || []).includes(s) ? 'checked' : '';
-            html += `<div style="display:flex; align-items:center; gap:5px; margin-bottom:3px;">
-                <input type="checkbox" id="qs_${s}" ${checked} onchange="toggleQuickStaff(${taskId}, '${s}', this.checked)">
-                <label for="qs_${s}" style="font-weight:normal; cursor:pointer;">${s}</label>
-            </div>`;
+            html += `<div style="font-size:12px;"><input type="checkbox" ${checked} onchange="toggleQuickStaff(${taskId}, '${s}', this.checked)"> ${s}</div>`;
         });
-        html += `</div></div>`;
-        html += `<button class="btn-blue" style="width:100%; font-size:11px;" onclick="closeQuickEdit()">OK</button>`;
+        html += `</div><button class="btn-blue" style="width:100%; margin-top:10px;" onclick="closeQuickEdit()">Fermer</button>`;
         
         modal.innerHTML = html;
         document.body.appendChild(modal);
@@ -250,28 +270,47 @@
         setTimeout(() => document.addEventListener('click', closeQuickEdit), 10);
     }
 
-    function updateQuickTask(taskId, field, value) {
-        const task = window.state.tasks.find(t => t.id === taskId);
-        if(task) { task[field] = value; saveState(); render(); }
+    function updateQuick(id, field, val) { const t = window.state.tasks.find(x => x.id === id); t[field] = val; saveToFirebase(); render(); }
+    function toggleQuickStaff(id, name, check) {
+        const t = window.state.tasks.find(x => x.id === id);
+        if(!t.staff) t.staff = [];
+        if(check) { if(!t.staff.includes(name)) t.staff.push(name); }
+        else { t.staff = t.staff.filter(s => s !== name); }
+        saveToFirebase(); render();
     }
+    function closeQuickEdit() { if(quickEditModal) { quickEditModal.remove(); quickEditModal = null; } }
 
-    function toggleQuickStaff(taskId, name, isChecked) {
-        const task = window.state.tasks.find(t => t.id === taskId);
-        if(!task.staff) task.staff = [];
-        if(isChecked) { if(!task.staff.includes(name)) task.staff.push(name); }
-        else { task.staff = task.staff.filter(s => s !== name); }
-        saveState(); render();
-    }
-
-    function closeQuickEdit() { if(quickEditModal) { quickEditModal.remove(); quickEditModal = null; document.removeEventListener('click', closeQuickEdit); } }
-
-    function selectTask(taskId, event) {
+    // RESIZE
+    function startResize(taskId, direction, event) {
         event.stopPropagation();
-        selectedTaskId = (selectedTaskId === taskId) ? null : taskId;
+        isResizing = true;
+        const task = window.state.tasks.find(t => t.id === taskId);
+        resizeData = { taskId, direction, startX: event.pageX, originalStart: new Date(task.start), originalEnd: new Date(task.end), lastDelta: 0 };
+        document.addEventListener('mousemove', handleResize);
+        document.addEventListener('mouseup', endResize);
+    }
+
+    function handleResize(event) {
+        if (!isResizing || !resizeData) return;
+        const deltaX = event.pageX - resizeData.startX;
+        const daysDelta = Math.round(deltaX / 50);
+        if (daysDelta === resizeData.lastDelta) return;
+        resizeData.lastDelta = daysDelta;
+        const task = window.state.tasks.find(t => t.id === resizeData.taskId);
+        const feries = getFeries(new Date(task.start).getFullYear());
+        if (resizeData.direction === 'left') {
+            let newStart = addWorkingDays(resizeData.originalStart, daysDelta, feries);
+            if (newStart < new Date(task.end)) { task.start = formatDateKey(newStart); task.duration = countBusinessDays(newStart, new Date(task.end)); }
+        } else {
+            let newEnd = addWorkingDays(resizeData.originalEnd, daysDelta, feries);
+            if (newEnd > new Date(task.start)) { task.end = formatDateKey(newEnd); task.duration = countBusinessDays(new Date(task.start), newEnd); }
+        }
         render();
     }
 
-    // Fonctions Modals
+    function endResize() { if (isResizing) { isResizing = false; resizeData = null; document.removeEventListener('mousemove', handleResize); document.removeEventListener('mouseup', endResize); saveToFirebase(); } }
+
+    // MODALS
     function openModalP(id = null) {
         const p = id ? window.state.projects.find(x => x.id === id) : null;
         document.getElementById('edit_proj_id').value = id || "";
@@ -279,14 +318,14 @@
         document.getElementById('p_cli').value = p ? p.cli : "";
         showModal('modalP');
     }
-
     function saveProject() {
         const id = document.getElementById('edit_proj_id').value;
         const data = { aff: document.getElementById('p_aff').value, cli: document.getElementById('p_cli').value };
         if(id) { let idx = window.state.projects.findIndex(x => x.id === parseInt(id)); window.state.projects[idx] = { ...window.state.projects[idx], ...data }; }
-        else { window.state.projects.push({ id: Date.now(), ...data, color: `hsl(${Math.random()*360}, 70%, 40%)` }); }
-        saveState(); hideModal('modalP');
+        else { window.state.projects.push({ id: Date.now(), ...data, color: `hsl(${Math.random()*360}, 65%, 45%)` }); }
+        saveToFirebase(); hideModal('modalP');
     }
+    function delProject() { if(confirm("Supprimer ?")) { window.state.projects = window.state.projects.filter(p => p.id !== parseInt(document.getElementById('edit_proj_id').value)); saveToFirebase(); hideModal('modalP'); } }
 
     function newTask() {
         updateSelectors();
@@ -295,35 +334,38 @@
         document.getElementById('t_start').value = formatDateKey(new Date());
         showModal('modalT');
     }
-
+    function editTask(id) {
+        const t = window.state.tasks.find(x => x.id === id);
+        updateSelectors();
+        document.getElementById('edit_task_id').value = t.id;
+        document.getElementById('t_name').value = t.name;
+        document.getElementById('t_start').value = t.start;
+        document.getElementById('t_dur').value = t.duration;
+        document.getElementById('t_proj_sel').value = t.pId;
+        showModal('modalT');
+    }
     function saveTask() {
         const id = document.getElementById('edit_task_id').value;
-        const taskData = {
+        const start = document.getElementById('t_start').value;
+        const dur = parseInt(document.getElementById('t_dur').value);
+        const tData = {
             id: id ? parseInt(id) : Date.now(),
             pId: parseInt(document.getElementById('t_proj_sel').value),
-            name: document.getElementById('t_name').value || "Sans titre",
+            name: document.getElementById('t_name').value || "Tâche",
+            start: start,
+            duration: dur,
+            end: addBusinessDays(new Date(start), dur),
             staff: id ? window.state.tasks.find(x => x.id === parseInt(id)).staff : [],
-            location: id ? window.state.tasks.find(x => x.id === parseInt(id)).location : "atelier",
-            start: document.getElementById('t_start').value,
-            duration: parseInt(document.getElementById('t_dur').value),
-            end: addBusinessDays(new Date(document.getElementById('t_start').value), parseInt(document.getElementById('t_dur').value))
+            location: id ? window.state.tasks.find(x => x.id === parseInt(id)).location : "atelier"
         };
-        if(id) window.state.tasks[window.state.tasks.findIndex(x => x.id === parseInt(id))] = taskData;
-        else window.state.tasks.push(taskData);
-        saveState(); hideModal('modalT');
+        if(id) window.state.tasks[window.state.tasks.findIndex(x => x.id === parseInt(id))] = tData;
+        else window.state.tasks.push(tData);
+        saveToFirebase(); hideModal('modalT');
     }
+    function delTask() { if(confirm("Supprimer ?")) { window.state.tasks = window.state.tasks.filter(t => t.id !== parseInt(document.getElementById('edit_task_id').value)); saveToFirebase(); hideModal('modalT'); } }
 
-    function delTask() { if(confirm("Supprimer ?")) { window.state.tasks = window.state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value)); saveState(); hideModal('modalT'); } }
-
-    function addStaff() { 
-        let n = document.getElementById('new_staff').value.trim(); 
-        if(n) { window.state.staff.push(n); window.state.staff.sort(); saveState(); document.getElementById('new_staff').value=''; updateSelectors(); } 
-    }
-
-    function addPont() {
-        let d = document.getElementById('new_pont_date').value;
-        if(d) { window.state.ponts.push(d); saveState(); updateSelectors(); render(); }
-    }
+    function addStaff() { let n = document.getElementById('new_staff').value.trim(); if(n) { window.state.staff.push(n); window.state.staff.sort(); saveToFirebase(); document.getElementById('new_staff').value=''; updateSelectors(); } }
+    function addPont() { let d = document.getElementById('new_pont_date').value; if(d) { window.state.ponts.push(d); saveToFirebase(); updateSelectors(); render(); } }
 
     function updateSelectors() {
         document.getElementById('t_proj_sel').innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff}</option>`).join('');
@@ -341,7 +383,7 @@
         const y = viewDate.getFullYear(), m = viewDate.getMonth(), daysInM = new Date(y, m + 1, 0).getDate(), feries = getFeries(y);
         document.getElementById('date-display').innerText = viewDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'}).toUpperCase();
         
-        let rowDays = `<tr><th class="col-fixed">Projet / Tâche</th>`;
+        let rowDays = `<tr><th class="col-fixed">Affaire / Client / Site</th>`;
         for(let d=1; d<=daysInM; d++) {
             let dt = new Date(y, m, d), ds = formatDateKey(dt), isF = feries[ds], isW = (dt.getDay()===0||dt.getDay()===6), isP = (isF === "PONT");
             rowDays += `<th class="col-day ${isW?'weekend':''} ${isP?'pont':(isF?'ferie':'')}"><div style="font-size:9px">${dt.toLocaleDateString('fr-FR',{weekday:'short'})}</div>${d}</th>`;
@@ -352,28 +394,35 @@
         if(searchFilter) projs = projs.filter(p => searchFilter.includes(p.id));
 
         projs.forEach(p => {
-            html += `<tr class="row-p"><td class="col-fixed" onclick="openModalP(${p.id})">${p.aff} — ${p.cli}</td><td colspan="${daysInM}"></td></tr>`;
+            html += `<tr class="row-p" onclick="openModalP(${p.id})"><td class="col-fixed"><b>${p.aff} — ${p.cli}</b></td><td colspan="${daysInM}"></td></tr>`;
             window.state.tasks.filter(t => t.pId === p.id).forEach(t => {
-                html += `<tr><td class="col-fixed" style="padding-left:25px; font-size:12px;" onclick="editTask(${t.id})">${t.name}</td>`;
+                html += `<tr><td class="col-fixed" style="padding-left:25px;"><span class="task-name" onclick="event.stopPropagation(); editTask(${t.id})">${t.name}</span></td>`;
                 
-                // Calcul des segments travaillés
-                let current = new Date(t.start), end = new Date(t.end);
+                const taskStart = new Date(t.start);
+                const taskEnd = new Date(t.end);
+                const staffClass = t.location === 'client' ? 'staff-client' : 'staff-atelier';
+
                 for(let d=1; d<=daysInM; d++) {
                     let cur = new Date(y, m, d), ds = formatDateKey(cur), isF = feries[ds], isW = (cur.getDay()===0||cur.getDay()===6), isP = (isF==="PONT");
                     let content = "";
                     
-                    if (cur >= new Date(t.start) && cur <= new Date(t.end) && isWorkingDay(cur, feries)) {
-                        // On n'affiche le contenu que sur le premier jour ouvré de la tâche dans ce mois pour éviter les répétitions
-                        const isStartOfMonth = (cur.getDate() === 1);
-                        const isStartOfTask = (formatDateKey(cur) === t.start);
+                    // On ne dessine la barre que sur le premier jour ouvré de la tâche rencontré dans le mois
+                    if (cur.toDateString() === taskStart.toDateString() || (cur.getDate() === 1 && cur <= taskEnd && cur >= taskStart)) {
+                        // Calcul de la largeur
+                        let displayEnd = new Date(Math.min(taskEnd, new Date(y, m, daysInM)));
+                        let displayStart = new Date(Math.max(taskStart, new Date(y, m, 1)));
+                        let widthDays = Math.ceil((displayEnd - displayStart) / 86400000) + 1;
                         
-                        // Détermination de la largeur basée sur la durée totale (simplifié pour l'exemple adaptatif)
-                        if (isStartOfTask || (isStartOfMonth && cur <= end)) {
-                            let staffClass = t.location === 'client' ? 'staff-client' : 'staff-atelier';
-                            content = `<div class="task-bar ${selectedTaskId===t.id?'selected':''}" style="background:${p.color}; width: calc(${t.duration * 50}px - 10px);" onclick="selectTask(${t.id}, event)" ondblclick="onTaskDoubleClick(${t.id}, event)">
-                                ${(t.staff||[]).map(s=>`<span class="staff-tag ${staffClass}">${s}</span>`).join('')}
-                            </div>`;
-                        }
+                        content = `<div class="task-bar ${selectedTaskId===t.id?'selected':''}" 
+                                     style="background:${p.color}; width:${widthDays * 50 - 4}px;" 
+                                     onclick="selectTask(${t.id}, event)" 
+                                     ondblclick="onTaskDoubleClick(${t.id}, event)">
+                                     <div class="resize-handle left" onmousedown="startResize(${t.id},'left',event)"></div>
+                                     <div style="display:flex; flex-wrap:wrap; gap:2px; pointer-events:none;">
+                                        ${(t.staff||[]).map(s=>`<span class="staff-tag ${staffClass}">${s}</span>`).join('')}
+                                     </div>
+                                     <div class="resize-handle right" onmousedown="startResize(${t.id},'right',event)"></div>
+                                   </div>`;
                     }
                     html += `<td class="col-day ${isW?'weekend':''} ${isP?'pont':(isF?'ferie':'')}">${content}</td>`;
                 }
@@ -386,7 +435,6 @@
     function showModal(id) { updateSelectors(); document.getElementById(id).style.display = 'flex'; }
     function hideModal(id) { document.getElementById(id).style.display = 'none'; }
     function changeMonth(n) { viewDate.setMonth(viewDate.getMonth() + n); render(); }
-    function editTask(id) { const t = window.state.tasks.find(x => x.id === id); updateSelectors(); document.getElementById('edit_task_id').value = t.id; document.getElementById('t_name').value = t.name; document.getElementById('t_start').value = t.start; document.getElementById('t_dur').value = t.duration; document.getElementById('t_proj_sel').value = t.pId; showModal('modalT'); }
 
     render();
 </script>
