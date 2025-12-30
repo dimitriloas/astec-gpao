@@ -524,6 +524,115 @@
         if(confirm("Supprimer cette tâche ?")) { window.state.tasks = window.state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value)); saveState(); hideModal('modalT'); }
     }
 
+    function printPDF() {
+        const projId = parseInt(document.getElementById('print_proj_sel').value);
+        const startDateStr = document.getElementById('print_start_date').value;
+        const showStaff = document.getElementById('print_show_staff').checked;
+        
+        if (!startDateStr) {
+            alert("Veuillez sélectionner une date de début");
+            return;
+        }
+        
+        const project = window.state.projects.find(p => p.id === projId);
+        if (!project) {
+            alert("Projet introuvable");
+            return;
+        }
+        
+        // Sauvegarder l'état actuel
+        const originalContent = document.getElementById('gantt-table').innerHTML;
+        const originalDisplay = document.getElementById('date-display').innerText;
+        
+        // Générer la vue d'impression
+        const startDate = new Date(startDateStr);
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 27); // 4 semaines = 28 jours
+        
+        const y = startDate.getFullYear();
+        const feries = getFeries(y);
+        
+        // Construire l'en-tête d'impression
+        document.getElementById('print-header').innerText = `${project.aff} — ${project.cli} | ${project.nature} | ${project.lie}`;
+        
+        // Générer les colonnes pour 28 jours
+        let rowWeeks = `<tr><th class="col-fixed" style="background:#f8f9fa">Semaines</th>`,
+            rowFerieNames = `<tr><th class="col-fixed" style="background:#f8f9fa">Jours Fériés</th>`,
+            rowDays = `<tr><th class="col-fixed">Affaire / Client / Site</th>`;
+        
+        let weekSpan = 0;
+        let dayCount = 0;
+        for(let i=0; i<28; i++) {
+            let dt = new Date(startDate);
+            dt.setDate(dt.getDate() + i);
+            let ds = formatDateKey(dt), isFerie = feries[ds], isWeekend = (dt.getDay()===0||dt.getDay()===6);
+            dayCount++;
+            weekSpan++;
+            
+            if (dt.getDay() === 0 || i === 27) { 
+                rowWeeks += `<th colspan="${weekSpan}" style="background:#f8f9fa; font-size:0.75em; border-bottom: 2px solid var(--accent);">Sem. ${getWeekNumber(dt)}</th>`; 
+                weekSpan = 0; 
+            }
+            rowFerieNames += `<th class="col-day ${isFerie ? 'ferie' : ''}">${isFerie ? `<div class="ferie-header-name">${isFerie}</div>` : ''}</th>`;
+            rowDays += `<th class="col-day ${isWeekend ? 'weekend' : ''} ${isFerie ? 'ferie' : ''}"><div style="font-size:0.8em;">${dt.toLocaleDateString('fr-FR', {weekday:'short'}).replace('.','')}</div><div>${dt.getDate()}</div></th>`;
+        }
+        
+        let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
+        html += `<tr class="row-p"><td class="col-fixed">
+            <b>${project.aff} — ${project.cli}</b>
+            <div style="font-size:0.85em; color:#7f8c8d; margin-top:2px;">${project.nature || ''}</div>
+            <div style="font-size:0.9em; color:#95a5a6; margin-top:3px;">${project.lie}</div>
+        </td><td colspan="${dayCount}"></td></tr>`;
+        
+        window.state.tasks.filter(t => t.pId === projId).forEach(t => {
+            html += `<tr><td class="col-fixed" style="padding-left:30px;">${t.name}</td>`;
+            let sD = new Date(t.start), eD = new Date(t.end);
+            
+            // Création des segments
+            let segments = [], currentSegment = null, current = new Date(sD);
+            while (current <= eD) {
+                if (isWorkingDay(current, feries)) {
+                    if (!currentSegment) currentSegment = { start: new Date(current), end: new Date(current) };
+                    else currentSegment.end = new Date(current);
+                } else if (currentSegment) { 
+                    segments.push(currentSegment); 
+                    currentSegment = null; 
+                }
+                current.setDate(current.getDate() + 1);
+            }
+            if (currentSegment) segments.push(currentSegment);
+            
+            for(let i=0; i<28; i++) {
+                let cur = new Date(startDate);
+                cur.setDate(cur.getDate() + i);
+                let content = "";
+                
+                segments.forEach((seg, idx) => {
+                    if (cur.toDateString() === seg.start.toDateString()) {
+                        let width = (Math.ceil((seg.end - seg.start) / 86400000) + 1) * 50;
+                        let staffDisplay = showStaff ? (t.staff||[]).map(s=>`<div class="staff-tag">${s}</div>`).join('') : '';
+                        content = `<div class="task-bar" style="background:${project.color}; width:${width-4}px;">${idx===0?staffDisplay:''}</div>`;
+                    }
+                });
+                html += `<td class="col-day ${cur.getDay()===0||cur.getDay()===6?'weekend':''}">${content}</td>`;
+            }
+            html += `</tr>`;
+        });
+        
+        document.getElementById('gantt-table').innerHTML = html + `</tbody></table>`;
+        
+        // Lancer l'impression
+        hideModal('modalPrint');
+        setTimeout(() => {
+            window.print();
+            // Restaurer la vue après l'impression
+            setTimeout(() => {
+                document.getElementById('gantt-table').innerHTML = originalContent;
+                document.getElementById('print-header').innerText = '';
+            }, 500);
+        }, 100);
+    }
+
     function render() {
         const y = viewDate.getFullYear(), m = viewDate.getMonth(), daysInM = new Date(y, m + 1, 0).getDate(), feries = getFeries(y);
         document.getElementById('date-display').innerText = viewDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'}).toUpperCase();
