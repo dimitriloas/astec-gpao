@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>ASTEC GPAO - Gestion Projets & Jours Fériés</title>
+    <title>ASTEC GPAO - Gestion Projets</title>
     <style>
         :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60; --weekend: #e8f5e9; --ferie: #fce4ec; --pont: #fff9c4; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 20px; background: #f4f7f6; }
@@ -19,89 +19,49 @@
 
         #date-display { font-weight: bold; font-size: 1.2em; min-width: 220px; text-align: center; color: var(--primary); }
 
+        /* Légende */
+        .legend-bar { display: flex; gap: 20px; background: white; padding: 10px 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); font-size: 0.85em; align-items: center; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .box { width: 18px; height: 18px; border: 1px solid #ddd; border-radius: 3px; }
+        .badge-ex { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; color: white; text-transform: uppercase; }
+
         .gantt-container { background: white; padding: 15px; border-radius: 8px; overflow-x: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); min-height: 400px; }
         table { border-collapse: collapse; width: max-content; min-width: 100%; position: relative; }
         th, td { border: 1px solid #ddd; padding: 0; text-align: center; min-height: 45px; }
 
         .col-day { width: 50px; min-width: 50px; height: 50px; position: relative; }
-        .sep-lundi { border-left: 3px solid #bdc3c7 !important; }
         .weekend { background: var(--weekend) !important; }
         .ferie { background: var(--ferie) !important; }
         .pont { background: var(--pont) !important; }
 
         .ferie-header-name { font-size: 10px; color: #d81b60; font-weight: bold; line-height: 1; padding: 2px; }
 
-        .col-fixed {
-            position: sticky; left: 0; background: #fff; width: 400px;
-            text-align: left; z-index: 20; border-right: 5px solid var(--primary);
-            padding: 8px 15px;
-        }
-
-        .proj-name { cursor: pointer; color: var(--primary); text-decoration: none; }
-        .proj-name:hover { color: var(--accent); text-decoration: underline; }
+        .col-fixed { position: sticky; left: 0; background: #fff; width: 400px; text-align: left; z-index: 20; border-right: 5px solid var(--primary); padding: 8px 15px; }
+        .row-p { background: #e9ecef; font-weight: bold; }
+        
         .task-name { cursor: pointer; color: var(--accent); text-decoration: underline; font-weight: bold; }
 
-        .row-p { background: #e9ecef; font-weight: bold; }
-        .task-bar-cell { position: relative; padding: 0 !important; vertical-align: top; }
         .task-bar {
             position: absolute; top: 2px; left: 2px; z-index: 10; border-radius: 4px;
             color: white; display: flex; flex-direction: column; gap: 2px; padding: 4px;
             font-size: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            overflow: hidden; box-sizing: border-box;
-            cursor: pointer;
-            pointer-events: auto;
-            transition: box-shadow 0.2s;
-            height: 42px;
-            min-height: 42px;
+            overflow: hidden; box-sizing: border-box; cursor: pointer; height: 42px;
         }
-
-        .task-bar:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
         .task-bar.selected { box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.5); z-index: 15; }
 
-        .staff-tag { background: rgba(255,255,255,0.25); padding: 1px 5px; border-radius: 2px; white-space: nowrap; }
+        .staff-tag { background: rgba(255,255,255,0.25); padding: 1px 4px; border-radius: 2px; white-space: nowrap; margin-right: 2px; }
+        .loc-tag { font-size: 9px; padding: 1px 4px; border-radius: 3px; margin-bottom: 2px; align-self: flex-start; text-transform: uppercase; }
+        .loc-atelier { background: #7f8c8d; color: white; }
+        .loc-client { background: #d35400; color: white; }
 
-        .resize-handle {
-            position: absolute; top: 0; width: 8px; height: 100%; cursor: ew-resize;
-            z-index: 20; opacity: 0; transition: opacity 0.2s;
-        }
+        .resize-handle { position: absolute; top: 0; width: 8px; height: 100%; cursor: ew-resize; z-index: 20; opacity: 0; }
         .task-bar.selected .resize-handle { opacity: 1; background: rgba(255,255,255,0.3); }
-        .resize-handle:hover { background: rgba(255,255,255,0.5) !important; }
-        .resize-handle.left { left: 0; border-radius: 4px 0 0 4px; }
-        .resize-handle.right { right: 0; border-radius: 0 4px 4px 0; }
 
         .modal { display: none; position: fixed; z-index: 100; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
         .modal-content { background: white; padding: 25px; border-radius: 8px; width: 450px; display: flex; flex-direction: column; gap: 12px; }
         input, select { padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
-
-        .quick-edit-modal {
-            position: absolute; background: white; border: 2px solid var(--accent);
-            border-radius: 8px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            z-index: 200; min-width: 250px;
-        }
-        .quick-edit-modal h4 { margin: 0 0 10px 0; color: var(--primary); }
-        .staff-checkbox { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
-
-        .staff-item {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 8px; border-bottom: 1px solid #eee;
-        }
-        .staff-item:hover { background: #f8f9fa; }
-        .staff-actions { display: flex; gap: 5px; }
-        .btn-small { padding: 4px 8px; font-size: 11px; cursor: pointer; border: none; border-radius: 3px; color: white; font-weight: 600; }
-        .btn-edit { background: #3498db; }
-        .btn-delete { background: #e74c3c; }
-
-        @media print {
-            @page { size: A3 landscape; margin: 10mm; }
-            body { margin: 0; padding: 0; background: white; }
-            .header, .controls, .no-print { display: none !important; }
-            .gantt-container { padding: 0; box-shadow: none; overflow: visible; }
-            .col-fixed { position: relative; border-right: 2px solid var(--primary); }
-            table { page-break-inside: avoid; font-size: 11px; }
-            .col-day { width: 40px; min-width: 40px; height: 40px; }
-            .print-header { display: block !important; margin-bottom: 15px; }
-        }
-        .print-header { display: none; font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 20px; color: var(--primary); }
+        
+        .staff-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #eee; }
     </style>
 </head>
 <body>
@@ -115,74 +75,61 @@
         <button class="btn-green" onclick="openModalP()">+ Projet</button>
         <button class="btn-blue" onclick="newTask()">+ Tâche</button>
         <button style="background: #9b59b6;" onclick="showModal('modalPerso')">👥 Personnel / Ponts</button>
-        <button class="btn-orange" onclick="showModal('modalPrint')">🖨️ Imprimer PDF</button>
         <div style="display: flex; gap: 5px; align-items: center; margin-left: auto;">
-            <input type="text" id="search-affaire" placeholder="🔍 Rechercher N° Affaire" style="width: 200px;" onkeyup="searchProject(event)">
-            <button class="btn-grey" onclick="clearSearch()" id="clear-search-btn" style="display:none;">✕</button>
+            <input type="text" id="search-affaire" placeholder="🔍 Rechercher N° Affaire" onkeyup="searchProject(event)">
         </div>
     </div>
 </div>
 
-<div class="print-header" id="print-header"></div>
+<div class="legend-bar">
+    <span style="font-weight: bold; color: var(--primary);">Légende :</span>
+    <div class="legend-item"><div class="box" style="background: var(--weekend);"></div> Week-end</div>
+    <div class="legend-item"><div class="box" style="background: var(--ferie);"></div> Jour Férié</div>
+    <div class="legend-item"><div class="box" style="background: var(--pont);"></div> Pont manuel</div>
+    <div style="border-left: 1px solid #ccc; height: 20px; margin: 0 10px;"></div>
+    <div class="legend-item"><span class="badge-ex" style="background: #7f8c8d;">Atelier</span> En interne</div>
+    <div class="legend-item"><span class="badge-ex" style="background: #d35400;">Client</span> Sur site</div>
+</div>
+
 <div class="gantt-container" id="gantt-table"></div>
 
 <div id="modalP" class="modal"><div class="modal-content">
-    <h3 id="modalP_title">Nouveau Projet</h3>
-    <input type="hidden" id="edit_proj_id">
-    <input type="text" id="p_aff" placeholder="N° Affaire">
-    <input type="text" id="p_cli" placeholder="Client">
-    <input type="text" id="p_nature" placeholder="Nature">
-    <input type="text" id="p_lie" placeholder="Lieu / Site">
-    <div style="display:flex; gap:10px;">
-        <button class="btn-green" id="btn_save_proj" style="flex:1" onclick="saveProject()">Créer</button>
-        <button id="btn_del_proj" class="btn-red" style="display:none" onclick="delProject()">Supprimer</button>
-    </div>
+    <h3 id="modalP_title">Projet</h3>
+    <input type="hidden" id="edit_proj_id"><input type="text" id="p_aff" placeholder="N° Affaire"><input type="text" id="p_cli" placeholder="Client"><input type="text" id="p_nature" placeholder="Nature"><input type="text" id="p_lie" placeholder="Lieu">
+    <button class="btn-green" onclick="saveProject()">Enregistrer</button>
+    <button id="btn_del_proj" class="btn-red" onclick="delProject()">Supprimer</button>
     <button class="btn-grey" onclick="hideModal('modalP')">Fermer</button>
 </div></div>
 
 <div id="modalT" class="modal"><div class="modal-content">
-    <h3 id="modalT_title">Nouvelle Tâche</h3>
+    <h3 id="modalT_title">Tâche</h3>
     <input type="hidden" id="edit_task_id">
     <select id="t_proj_sel"></select>
     <input type="text" id="t_name" placeholder="Désignation">
-    <label>Personnel (Ctrl pour multi-sélection) :</label>
-    <select id="t_staff_sel" multiple style="height: 120px; padding: 5px;"></select>
-    <label>Début :</label><input type="date" id="t_start">
-    <label>Durée (jours ouvrés) :</label><input type="number" id="t_dur" value="1" min="1">
-    <div style="display:flex; gap:10px;">
-        <button class="btn-blue" style="flex:1" onclick="saveTask()">Enregistrer</button>
-        <button id="btn_del_task" class="btn-red" style="display:none" onclick="delTask()">Supprimer</button>
+    <label>Lieu :</label>
+    <div style="display:flex; gap:20px;">
+        <label><input type="radio" name="t_location" value="atelier" checked> Atelier</label>
+        <label><input type="radio" name="t_location" value="client"> Site Client</label>
     </div>
+    <label>Personnel :</label>
+    <select id="t_staff_sel" multiple style="height: 80px;"></select>
+    <div style="display:flex; gap:10px;">
+        <input type="date" id="t_start" style="flex:1">
+        <input type="number" id="t_dur" value="1" min="1" style="width:70px">
+    </div>
+    <button class="btn-blue" onclick="saveTask()">Enregistrer</button>
+    <button id="btn_del_task" class="btn-red" onclick="delTask()">Supprimer</button>
     <button class="btn-grey" onclick="hideModal('modalT')">Annuler</button>
 </div></div>
 
 <div id="modalPerso" class="modal"><div class="modal-content">
-    <h3>Gestion Personnel</h3>
-    <div id="staff-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; margin-bottom:10px;"></div>
-    <div style="display:flex; gap:5px;">
-        <input type="text" id="new_staff" placeholder="Nom Prénom" style="flex:1">
-        <button class="btn-green" onclick="addStaff()">Ajouter</button>
-    </div>
+    <h3>Personnel & Ponts</h3>
+    <div id="staff-list" style="max-height: 100px; overflow-y: auto; border: 1px solid #eee;"></div>
+    <div style="display:flex; gap:5px;"><input type="text" id="new_staff" placeholder="Nom"><button class="btn-green" onclick="addStaff()">+</button></div>
     <hr>
-    <h3>Gestion des Ponts</h3>
-    <div id="pont-list" style="max-height: 100px; overflow-y: auto; border: 1px solid #eee; margin-bottom:10px;"></div>
-    <div style="display:flex; gap:5px;">
-        <input type="date" id="new_pont_date" style="flex:1">
-        <button class="btn-orange" onclick="addPont()">Ajouter Pont</button>
-    </div>
-    <button class="btn-grey" style="margin-top:10px;" onclick="hideModal('modalPerso')">Fermer</button>
-</div></div>
-
-<div id="modalPrint" class="modal"><div class="modal-content">
-    <h3>🖨️ Imprimer au format PDF</h3>
-    <label>Projet :</label><select id="print_proj_sel"></select>
-    <label>Date de début (4 semaines) :</label><input type="date" id="print_start_date">
-    <div style="display:flex; align-items:center; gap:8px;">
-        <input type="checkbox" id="print_show_staff" checked>
-        <label for="print_show_staff">Afficher noms personnel</label>
-    </div>
-    <button class="btn-orange" onclick="printPDF()">📄 Générer PDF</button>
-    <button class="btn-grey" onclick="hideModal('modalPrint')">Annuler</button>
+    <div id="pont-list" style="max-height: 100px; overflow-y: auto; border: 1px solid #eee;"></div>
+    <div style="display:flex; gap:5px;"><input type="date" id="new_pont_date"><button class="btn-orange" onclick="addPont()">Ajouter Pont</button></div>
+    <button class="btn-grey" onclick="hideModal('modalPerso')">Fermer</button>
 </div></div>
 
 <script type="module">
@@ -215,9 +162,7 @@
         }
     });
 
-    window.saveToFirebase = function() {
-        set(dbRef, window.state);
-    };
+    window.saveToFirebase = function() { set(dbRef, window.state); };
 </script>
 
 <script>
@@ -226,7 +171,6 @@
     let selectedTaskId = null;
     let isResizing = false;
     let resizeData = null;
-    let quickEditModal = null;
     let searchFilter = null;
 
     function formatDateKey(date) {
@@ -249,16 +193,11 @@
             [`${year}-11-11`]: "Armist.", [`${year}-12-25`]: "Noël",
             [formatDateKey(lP)]: "Pâques", [formatDateKey(asc)]: "Ascens.", [formatDateKey(lPent)]: "Pentec."
         };
-        // Intégrer les ponts comme des jours fériés
-        if (window.state.ponts) {
-            window.state.ponts.forEach(date => { f[date] = "PONT"; });
-        }
+        if (window.state.ponts) window.state.ponts.forEach(date => { f[date] = "PONT"; });
         return f;
     }
 
-    function saveState() {
-        if (window.saveToFirebase) window.saveToFirebase();
-    }
+    function saveState() { if (window.saveToFirebase) window.saveToFirebase(); }
 
     function getWeekNumber(d) {
         d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -307,60 +246,17 @@
 
     function selectTask(taskId, event) {
         event.stopPropagation();
-        closeQuickEditModal();
         selectedTaskId = (selectedTaskId === taskId) ? null : taskId;
         render();
     }
-
-    function onTaskDoubleClick(taskId, event) {
-        event.stopPropagation();
-        selectedTaskId = taskId;
-        showQuickEditModal(taskId, event);
-    }
-
-    function showQuickEditModal(taskId, event) {
-        closeQuickEditModal();
-        const task = window.state.tasks.find(t => t.id === taskId);
-        if (!task) return;
-        const modal = document.createElement('div');
-        modal.className = 'quick-edit-modal';
-        modal.style.left = event.pageX + 'px';
-        modal.style.top = event.pageY + 'px';
-        let html = `<h4>👥 Personnel affecté</h4>`;
-        window.state.staff.forEach(s => {
-            const checked = task.staff.includes(s) ? 'checked' : '';
-            html += `<div class="staff-checkbox"><input type="checkbox" id="quick_${s}" value="${s}" ${checked} onchange="updateTaskStaff(${taskId}, this.value, this.checked)"><label for="quick_${s}">${s}</label></div>`;
-        });
-        html += `<button class="btn-grey" style="margin-top:10px; width:100%;" onclick="closeQuickEditModal()">Fermer</button>`;
-        modal.innerHTML = html;
-        document.body.appendChild(modal);
-        quickEditModal = modal;
-        setTimeout(() => document.addEventListener('click', closeQuickEditModalOnOutsideClick), 100);
-    }
-
-    function updateTaskStaff(taskId, staffName, isChecked) {
-        const task = window.state.tasks.find(t => t.id === taskId);
-        if (!task) return;
-        if (isChecked) { if (!task.staff.includes(staffName)) task.staff.push(staffName); }
-        else { task.staff = task.staff.filter(s => s !== staffName); }
-        saveState();
-    }
-
-    function closeQuickEditModal() { if (quickEditModal) { quickEditModal.remove(); quickEditModal = null; document.removeEventListener('click', closeQuickEditModalOnOutsideClick); } }
-    function closeQuickEditModalOnOutsideClick(e) { if (quickEditModal && !quickEditModal.contains(e.target)) closeQuickEditModal(); }
 
     function startResize(taskId, direction, event) {
         event.stopPropagation();
         isResizing = true;
         const task = window.state.tasks.find(t => t.id === taskId);
-        resizeData = { 
-            taskId, direction, startX: event.pageX, 
-            originalStart: new Date(task.start), originalEnd: new Date(task.end), lastDelta: 0
-        };
+        resizeData = { taskId, direction, startX: event.pageX, originalStart: new Date(task.start), originalEnd: new Date(task.end), lastDelta: 0 };
         document.addEventListener('mousemove', handleResize);
         document.addEventListener('mouseup', endResize);
-        document.body.style.cursor = 'ew-resize';
-        document.body.style.userSelect = 'none';
     }
 
     function handleResize(event) {
@@ -370,100 +266,38 @@
         if (daysDelta === resizeData.lastDelta) return;
         resizeData.lastDelta = daysDelta;
         const task = window.state.tasks.find(t => t.id === resizeData.taskId);
-        const y = resizeData.originalStart.getFullYear();
-        const feries = getFeries(y);
-        let newStart = new Date(resizeData.originalStart);
-        let newEnd = new Date(resizeData.originalEnd);
+        const feries = getFeries(new Date(task.start).getFullYear());
         if (resizeData.direction === 'left') {
-            newStart = addWorkingDays(resizeData.originalStart, daysDelta, feries);
-            if (newStart >= newEnd) return;
+            let newStart = addWorkingDays(resizeData.originalStart, daysDelta, feries);
+            if (newStart < new Date(task.end)) { task.start = formatDateKey(newStart); task.duration = countBusinessDays(newStart, new Date(task.end)); }
         } else {
-            newEnd = addWorkingDays(resizeData.originalEnd, daysDelta, feries);
-            if (newEnd <= newStart) return;
+            let newEnd = addWorkingDays(resizeData.originalEnd, daysDelta, feries);
+            if (newEnd > new Date(task.start)) { task.end = formatDateKey(newEnd); task.duration = countBusinessDays(new Date(task.start), newEnd); }
         }
-        task.start = formatDateKey(newStart);
-        task.end = formatDateKey(newEnd);
-        task.duration = countBusinessDays(newStart, newEnd);
         render();
     }
 
-    function endResize() { 
-        if (isResizing) { 
-            isResizing = false; resizeData = null; 
-            document.removeEventListener('mousemove', handleResize); 
-            document.removeEventListener('mouseup', endResize); 
-            document.body.style.cursor = ''; document.body.style.userSelect = ''; 
-            saveState(); 
-        } 
-    }
+    function endResize() { if (isResizing) { isResizing = false; resizeData = null; document.removeEventListener('mousemove', handleResize); document.removeEventListener('mouseup', endResize); saveState(); } }
 
     function addStaff() { 
         let n = document.getElementById('new_staff').value.trim(); 
-        if(n && !window.state.staff.includes(n)) { 
-            window.state.staff.push(n); 
-            window.state.staff.sort(); 
-            saveState(); 
-            document.getElementById('new_staff').value=''; 
-            updateSelectors(); 
-        } 
+        if(n && !window.state.staff.includes(n)) { window.state.staff.push(n); window.state.staff.sort(); saveState(); document.getElementById('new_staff').value=''; updateSelectors(); } 
     }
 
     function addPont() {
         let d = document.getElementById('new_pont_date').value;
-        if(d && !window.state.ponts.includes(d)) {
-            window.state.ponts.push(d);
-            window.state.ponts.sort();
-            saveState();
-            updateSelectors();
-            render();
-        }
-    }
-
-    function removePont(d) {
-        if(confirm(`Supprimer le pont du ${d} ?`)) {
-            window.state.ponts = window.state.ponts.filter(p => p !== d);
-            saveState();
-            updateSelectors();
-            render();
-        }
-    }
-
-    function renameStaff(oldName) {
-        let newName = prompt("Nouveau nom :", oldName);
-        if (newName && newName.trim() !== "" && newName !== oldName) {
-            newName = newName.trim();
-            const idx = window.state.staff.indexOf(oldName);
-            if (idx !== -1) window.state.staff[idx] = newName;
-            window.state.tasks.forEach(t => { if (t.staff && t.staff.includes(oldName)) t.staff = t.staff.map(s => s === oldName ? newName : s); });
-            saveState();
-            updateSelectors();
-        }
-    }
-
-    function removeStaffFromList(name) {
-        if (confirm(`Retirer "${name}" de la liste ?`)) { 
-            window.state.staff = window.state.staff.filter(s => s !== name); 
-            saveState(); 
-            updateSelectors();
-        }
+        if(d && !window.state.ponts.includes(d)) { window.state.ponts.push(d); window.state.ponts.sort(); saveState(); updateSelectors(); render(); }
     }
 
     function updateSelectors() {
-        const projSel = document.getElementById('t_proj_sel');
-        if(projSel) projSel.innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
-        
-        const staffSel = document.getElementById('t_staff_sel');
-        if(staffSel) staffSel.innerHTML = window.state.staff.map(s => `<option value="${s}">${s}</option>`).join('');
-        
-        const printSel = document.getElementById('print_proj_sel');
-        if(printSel) printSel.innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} — ${p.cli}</option>`).join('');
-        
-        const staffList = document.getElementById('staff-list');
-        if(staffList) staffList.innerHTML = window.state.staff.map(s => `<div class="staff-item"><span>${s}</span><div class="staff-actions"><button class="btn-small btn-edit" onclick="renameStaff('${s}')">Modif.</button><button class="btn-small btn-delete" onclick="removeStaffFromList('${s}')">X</button></div></div>`).join('');
-
-        const pontList = document.getElementById('pont-list');
-        if(pontList) pontList.innerHTML = (window.state.ponts || []).map(p => `<div class="staff-item"><span>${new Date(p).toLocaleDateString()}</span><button class="btn-small btn-delete" onclick="removePont('${p}')">X</button></div>`).join('');
+        document.getElementById('t_proj_sel').innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
+        document.getElementById('t_staff_sel').innerHTML = window.state.staff.map(s => `<option value="${s}">${s}</option>`).join('');
+        document.getElementById('staff-list').innerHTML = window.state.staff.map(s => `<div class="staff-item"><span>${s}</span><button class="btn-small btn-red" onclick="removeStaffFromList('${s}')">X</button></div>`).join('');
+        document.getElementById('pont-list').innerHTML = (window.state.ponts || []).map(p => `<div class="staff-item"><span>${new Date(p).toLocaleDateString()}</span><button class="btn-small btn-red" onclick="removePont('${p}')">X</button></div>`).join('');
     }
+
+    function removeStaffFromList(name) { if (confirm(`Retirer ${name} ?`)) { window.state.staff = window.state.staff.filter(s => s !== name); saveState(); updateSelectors(); } }
+    function removePont(d) { if(confirm(`Supprimer pont ?`)) { window.state.ponts = window.state.ponts.filter(p => p !== d); saveState(); updateSelectors(); render(); } }
 
     function openModalP(id = null) {
         const p = id ? window.state.projects.find(x => x.id === id) : null;
@@ -473,7 +307,6 @@
         document.getElementById('p_cli').value = p ? p.cli : "";
         document.getElementById('p_nature').value = p ? p.nature : "";
         document.getElementById('p_lie').value = p ? p.lie : "";
-        document.getElementById('btn_save_proj').innerText = id ? "Mettre à jour" : "Créer";
         document.getElementById('btn_del_proj').style.display = id ? "block" : "none";
         showModal('modalP');
     }
@@ -486,55 +319,39 @@
         saveState(); hideModal('modalP');
     }
 
-    function delProject() {
-        if(confirm("Supprimer ce projet ?")) {
-            const id = parseInt(document.getElementById('edit_proj_id').value);
-            window.state.projects = window.state.projects.filter(x => x.id !== id);
-            window.state.tasks = window.state.tasks.filter(x => x.pId !== id);
-            saveState(); hideModal('modalP');
-        }
-    }
-
     function newTask() {
         updateSelectors();
-        document.getElementById('modalT_title').innerText = "Nouvelle Tâche";
         document.getElementById('edit_task_id').value = "";
         document.getElementById('t_name').value = "";
         document.getElementById('t_start').value = formatDateKey(new Date());
-        document.getElementById('t_dur').value = "1";
-        document.getElementById('btn_del_task').style.display = "none";
-        const projSel = document.getElementById('t_proj_sel');
-        if (projSel.options.length > 0) projSel.selectedIndex = 0;
-        const staffSel = document.getElementById('t_staff_sel');
-        Array.from(staffSel.options).forEach(opt => opt.selected = false);
+        document.querySelector('input[name="t_location"][value="atelier"]').checked = true;
         showModal('modalT');
     }
 
     function editTask(id) {
         const t = window.state.tasks.find(x => x.id === id);
         updateSelectors();
-        document.getElementById('modalT_title').innerText = "Modifier Tâche";
         document.getElementById('edit_task_id').value = t.id;
         document.getElementById('t_name').value = t.name;
         document.getElementById('t_start').value = t.start;
-        document.getElementById('t_dur').value = t.duration || 1;
-        document.getElementById('btn_del_task').style.display = "block";
+        document.getElementById('t_dur').value = t.duration;
         document.getElementById('t_proj_sel').value = t.pId;
+        if(t.location) document.querySelector(`input[name="t_location"][value="${t.location}"]`).checked = true;
         const sel = document.getElementById('t_staff_sel');
-        Array.from(sel.options).forEach(opt => opt.selected = t.staff && t.staff.includes(opt.value));
+        Array.from(sel.options).forEach(opt => opt.selected = t.staff.includes(opt.value));
+        document.getElementById('btn_del_task').style.display = "block";
         showModal('modalT');
     }
 
     function saveTask() {
         const id = document.getElementById('edit_task_id').value;
         const staff = Array.from(document.getElementById('t_staff_sel').selectedOptions).map(o => o.value);
-        if(!document.getElementById('t_start').value) return alert("Date de début requise");
-        if(staff.length === 0) return alert("Veuillez sélectionner au moins un membre du personnel");
+        const location = document.querySelector('input[name="t_location"]:checked').value;
         const taskData = {
             id: id ? parseInt(id) : Date.now(),
             pId: parseInt(document.getElementById('t_proj_sel').value),
             name: document.getElementById('t_name').value || "Tâche",
-            staff, 
+            staff, location,
             start: document.getElementById('t_start').value,
             duration: parseInt(document.getElementById('t_dur').value),
             end: addBusinessDays(new Date(document.getElementById('t_start').value), parseInt(document.getElementById('t_dur').value))
@@ -544,99 +361,34 @@
         saveState(); hideModal('modalT');
     }
 
-    function delTask() {
-        if(confirm("Supprimer cette tâche ?")) { window.state.tasks = window.state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value)); saveState(); hideModal('modalT'); }
-    }
+    function delTask() { if(confirm("Supprimer ?")) { window.state.tasks = window.state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value)); saveState(); hideModal('modalT'); } }
 
     function searchProject(event) {
-        const searchValue = document.getElementById('search-affaire').value.trim().toLowerCase();
-        if (searchValue === '') { clearSearch(); return; }
-        const foundProjects = window.state.projects.filter(p => p.aff.toLowerCase().includes(searchValue));
-        if (foundProjects.length > 0) { searchFilter = foundProjects.map(p => p.id); document.getElementById('clear-search-btn').style.display = 'block'; render(); } 
-        else { searchFilter = []; document.getElementById('clear-search-btn').style.display = 'block'; render(); }
-    }
-
-    function clearSearch() { searchFilter = null; document.getElementById('search-affaire').value = ''; document.getElementById('clear-search-btn').style.display = 'none'; render(); }
-
-    function printPDF() {
-        const projId = parseInt(document.getElementById('print_proj_sel').value);
-        const startDateStr = document.getElementById('print_start_date').value;
-        const showStaff = document.getElementById('print_show_staff').checked;
-        if (!startDateStr) return alert("Veuillez sélectionner une date de début");
-        const project = window.state.projects.find(p => p.id === projId);
-        if (!project) return alert("Projet introuvable");
-        const originalContent = document.getElementById('gantt-table').innerHTML;
-        const startDate = new Date(startDateStr);
-        const y = startDate.getFullYear();
-        const feries = getFeries(y);
-        document.getElementById('print-header').innerText = `${project.aff} — ${project.cli} | ${project.nature} | ${project.lie}`;
-        let rowWeeks = `<tr><th class="col-fixed" style="background:#f8f9fa">Semaines</th>`,
-            rowFerieNames = `<tr><th class="col-fixed" style="background:#f8f9fa">Jours Fériés</th>`,
-            rowDays = `<tr><th class="col-fixed">Affaire / Client / Site</th>`;
-        let weekSpan = 0;
-        for(let i=0; i<28; i++) {
-            let dt = new Date(startDate); dt.setDate(dt.getDate() + i);
-            let ds = formatDateKey(dt), isFerie = feries[ds], isWeekend = (dt.getDay()===0||dt.getDay()===6);
-            let isPont = (isFerie === "PONT");
-            weekSpan++;
-            if (dt.getDay() === 0 || i === 27) { rowWeeks += `<th colspan="${weekSpan}" style="background:#f8f9fa; font-size:0.75em; border-bottom: 2px solid var(--accent);">Sem. ${getWeekNumber(dt)}</th>`; weekSpan = 0; }
-            rowFerieNames += `<th class="col-day ${isPont ? 'pont' : (isFerie ? 'ferie' : '')}">${isFerie ? `<div class="ferie-header-name">${isFerie}</div>` : ''}</th>`;
-            rowDays += `<th class="col-day ${isWeekend ? 'weekend' : ''} ${isPont ? 'pont' : (isFerie ? 'ferie' : '')}"><div style="font-size:0.8em;">${dt.toLocaleDateString('fr-FR', {weekday:'short'}).replace('.','')}</div><div>${dt.getDate()}</div></th>`;
-        }
-        let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
-        html += `<tr class="row-p"><td class="col-fixed"><b>${project.aff} — ${project.cli}</b><div style="font-size:0.85em; color:#7f8c8d; margin-top:2px;">${project.nature || ''}</div><div style="font-size:0.9em; color:#95a5a6; margin-top:3px;">${project.lie}</div></td><td colspan="28"></td></tr>`;
-        window.state.tasks.filter(t => t.pId === projId).forEach(t => {
-            html += `<tr><td class="col-fixed" style="padding-left:30px;">${t.name}</td>`;
-            let sD = new Date(t.start), eD = new Date(t.end), segments = [], curSeg = null, current = new Date(sD);
-            while (current <= eD) {
-                if (isWorkingDay(current, feries)) { if (!curSeg) curSeg = { start: new Date(current), end: new Date(current) }; else curSeg.end = new Date(current); }
-                else if (curSeg) { segments.push(curSeg); curSeg = null; }
-                current.setDate(current.getDate() + 1);
-            }
-            if (curSeg) segments.push(curSeg);
-            for(let i=0; i<28; i++) {
-                let cur = new Date(startDate); cur.setDate(cur.getDate() + i); 
-                let ds = formatDateKey(cur), isFerie = feries[ds], isWeekend = (cur.getDay()===0||cur.getDay()===6);
-                let isPont = (isFerie === "PONT");
-                let content = "";
-                segments.forEach((seg, idx) => {
-                    if (cur.toDateString() === seg.start.toDateString()) {
-                        let width = (Math.ceil((seg.end - seg.start) / 86400000) + 1) * 50;
-                        let staffDisplay = (showStaff && idx === 0) ? (t.staff||[]).map(s=>`<div class="staff-tag">${s}</div>`).join('') : '';
-                        content = `<div class="task-bar" style="background:${project.color}; width:${width-4}px;">${staffDisplay}</div>`;
-                    }
-                });
-                html += `<td class="col-day ${isWeekend ? 'weekend' : ''} ${isPont ? 'pont' : (isFerie ? 'ferie' : '')}">${content}</td>`;
-            }
-            html += `</tr>`;
-        });
-        document.getElementById('gantt-table').innerHTML = html + `</tbody></table>`;
-        hideModal('modalPrint');
-        setTimeout(() => { window.print(); setTimeout(() => { document.getElementById('gantt-table').innerHTML = originalContent; document.getElementById('print-header').innerText = ''; }, 500); }, 100);
+        const val = document.getElementById('search-affaire').value.toLowerCase();
+        if(!val) searchFilter = null;
+        else searchFilter = window.state.projects.filter(p => p.aff.toLowerCase().includes(val)).map(p => p.id);
+        render();
     }
 
     function render() {
         const y = viewDate.getFullYear(), m = viewDate.getMonth(), daysInM = new Date(y, m + 1, 0).getDate(), feries = getFeries(y);
         document.getElementById('date-display').innerText = viewDate.toLocaleDateString('fr-FR', {month:'long', year:'numeric'}).toUpperCase();
-        let rowWeeks = `<tr><th class="col-fixed" style="background:#f8f9fa">Semaines</th>`,
-            rowFerieNames = `<tr><th class="col-fixed" style="background:#f8f9fa">Jours Fériés</th>`,
-            rowDays = `<tr><th class="col-fixed">Affaire / Client / Site</th>`;
+        
+        let rowWeeks = `<tr><th class="col-fixed">Semaines</th>`, rowFerieNames = `<tr><th class="col-fixed">Fériés</th>`, rowDays = `<tr><th class="col-fixed">Affaire / Client / Site</th>`;
         let weekSpan = 0;
         for(let d=1; d<=daysInM; d++) {
-            let dt = new Date(y, m, d), ds = formatDateKey(dt), isFerie = feries[ds], isWeekend = (dt.getDay()===0||dt.getDay()===6);
-            let isPont = (isFerie === "PONT");
-            weekSpan++;
-            if (dt.getDay() === 0 || d === daysInM) { rowWeeks += `<th colspan="${weekSpan}" style="background:#f8f9fa; font-size:0.75em; border-bottom: 2px solid var(--accent);">Sem. ${getWeekNumber(dt)}</th>`; weekSpan = 0; }
-            rowFerieNames += `<th class="col-day ${isPont ? 'pont' : (isFerie ? 'ferie' : '')}">${isFerie ? `<div class="ferie-header-name">${isFerie}</div>` : ''}</th>`;
-            rowDays += `<th class="col-day ${isWeekend ? 'weekend' : ''} ${isPont ? 'pont' : (isFerie ? 'ferie' : '')}"><div style="font-size:0.8em;">${dt.toLocaleDateString('fr-FR', {weekday:'short'}).replace('.','')}</div><div>${d}</div></th>`;
+            let dt = new Date(y, m, d), ds = formatDateKey(dt), isFerie = feries[ds], isWeekend = (dt.getDay()===0||dt.getDay()===6), isPont = (isFerie === "PONT");
+            weekSpan++; if (dt.getDay() === 0 || d === daysInM) { rowWeeks += `<th colspan="${weekSpan}" style="font-size:10px; border-bottom:2px solid var(--accent)">S${getWeekNumber(dt)}</th>`; weekSpan = 0; }
+            rowFerieNames += `<th class="col-day ${isPont?'pont':(isFerie?'ferie':'')}">${isFerie?`<div class="ferie-header-name">${isFerie}</div>`:''}</th>`;
+            rowDays += `<th class="col-day ${isWeekend?'weekend':''} ${isPont?'pont':(isFerie?'ferie':'')}"><div style="font-size:9px">${dt.toLocaleDateString('fr-FR',{weekday:'short'}).replace('.','')}</div>${d}</th>`;
         }
+        
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
-        const mStart = new Date(y, m, 1), mEnd = new Date(y, m + 1, 0);
-        let projs = window.state.projects.filter(p => window.state.tasks.some(t => t.pId === p.id && new Date(t.start) <= mEnd && new Date(t.end) >= mStart));
-        if (searchFilter !== null) projs = searchFilter.length === 0 ? [] : projs.filter(p => searchFilter.includes(p.id));
-        if (searchFilter !== null && projs.length === 0) html += `<tr><td colspan="${daysInM + 1}" style="text-align:center; padding:40px; color:#7f8c8d; font-style:italic;">Aucun projet trouvé avec ce N° d'affaire</td></tr>`;
+        let projs = window.state.projects;
+        if(searchFilter) projs = projs.filter(p => searchFilter.includes(p.id));
+
         projs.forEach(p => {
-            html += `<tr class="row-p"><td class="col-fixed"><span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} — ${p.cli}</b><div style="font-size:0.85em; color:#7f8c8d; margin-top:2px;">${p.nature || ''}</div></span><div style="font-size:0.9em; color:#95a5a6; margin-top:3px;">${p.lie}</div></td><td colspan="${daysInM}"></td></tr>`;
+            html += `<tr class="row-p"><td class="col-fixed" onclick="openModalP(${p.id})"><b>${p.aff} — ${p.cli}</b><div style="font-size:11px; color:#7f8c8d">${p.nature || ''}</div></td><td colspan="${daysInM}"></td></tr>`;
             window.state.tasks.filter(t => t.pId === p.id).forEach(t => {
                 html += `<tr><td class="col-fixed" style="padding-left:30px;"><span class="task-name" onclick="editTask(${t.id})">${t.name}</span></td>`;
                 let sD = new Date(t.start), eD = new Date(t.end), segments = [], curSeg = null, current = new Date(sD);
@@ -647,16 +399,21 @@
                 }
                 if (curSeg) segments.push(curSeg);
                 for(let d=1; d<=daysInM; d++) {
-                    let cur = new Date(y, m, d), content = "";
-                    let ds = formatDateKey(cur), isFerie = feries[ds], isWeekend = (cur.getDay()===0||cur.getDay()===6);
-                    let isPont = (isFerie === "PONT");
+                    let cur = new Date(y, m, d), content = "", ds = formatDateKey(cur), isF = feries[ds], isW = (cur.getDay()===0||cur.getDay()===6), isP = (isF==="PONT");
                     segments.forEach((seg, idx) => {
                         if (cur.toDateString() === seg.start.toDateString()) {
                             let width = (Math.ceil((seg.end - seg.start) / 86400000) + 1) * 50;
-                            content = `<div class="task-bar ${selectedTaskId===t.id?'selected':''}" style="background:${p.color}; width:${width-4}px;" onclick="selectTask(${t.id}, event)" ondblclick="onTaskDoubleClick(${t.id}, event)">${idx===0?`<div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', event)"></div>`:''}${idx===0?(t.staff||[]).map(s=>`<div class="staff-tag">${s}</div>`).join(''):''}${idx===segments.length-1?`<div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', event)"></div>`:''}</div>`;
+                            let locClass = t.location === 'client' ? 'loc-client' : 'loc-atelier';
+                            let locLabel = t.location === 'client' ? 'Client' : 'Atelier';
+                            content = `<div class="task-bar ${selectedTaskId===t.id?'selected':''}" style="background:${p.color}; width:${width-4}px;" onclick="selectTask(${t.id}, event)">
+                                ${idx===0?`<div class="loc-tag ${locClass}">${locLabel}</div>`:''}
+                                <div style="display:flex; flex-wrap:wrap; gap:2px">${idx===0?(t.staff||[]).map(s=>`<span class="staff-tag">${s}</span>`).join(''):''}</div>
+                                ${idx===0?`<div class="resize-handle" style="left:0" onmousedown="startResize(${t.id},'left',event)"></div>`:''}
+                                ${idx===segments.length-1?`<div class="resize-handle" style="right:0" onmousedown="startResize(${t.id},'right',event)"></div>`:''}
+                            </div>`;
                         }
                     });
-                    html += `<td class="col-day ${isWeekend ? 'weekend' : ''} ${isPont ? 'pont' : (isFerie ? 'ferie' : '')}">${content}</td>`;
+                    html += `<td class="col-day ${isW?'weekend':''} ${isP?'pont':(isF?'ferie':'')}">${content}</td>`;
                 }
                 html += `</tr>`;
             });
@@ -664,10 +421,10 @@
         document.getElementById('gantt-table').innerHTML = html + `</tbody></table>`;
     }
 
-    document.addEventListener('click', () => { if (!isResizing) { selectedTaskId = null; render(); } });
     function showModal(id) { updateSelectors(); document.getElementById(id).style.display = 'flex'; }
     function hideModal(id) { document.getElementById(id).style.display = 'none'; }
     function changeMonth(n) { viewDate.setMonth(viewDate.getMonth() + n); render(); }
+    document.addEventListener('click', () => { if(!isResizing) { selectedTaskId = null; render(); } });
 
     render();
 </script>
