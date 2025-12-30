@@ -252,18 +252,22 @@
 
     function addBusinessDays(startDate, days) {
         let d = new Date(startDate);
+        const y = d.getFullYear();
+        const feries = getFeries(y);
         let c = 0;
-        while (c < days - 1) {
-            d.setDate(d.getDate() + 1);
-            if (d.getDay() !== 0 && d.getDay() !== 6) c++;
+        while (c < days) {
+            if (isWorkingDay(d, feries)) c++;
+            if (c < days) d.setDate(d.getDate() + 1);
         }
         return formatDateKey(d);
     }
 
     function countBusinessDays(start, end) {
         let count = 0, current = new Date(start), endDate = new Date(end);
+        const y = current.getFullYear();
+        const feries = getFeries(y);
         while (current <= endDate) {
-            if (current.getDay() !== 0 && current.getDay() !== 6) count++;
+            if (isWorkingDay(current, feries)) count++;
             current.setDate(current.getDate() + 1);
         }
         return count;
@@ -273,6 +277,20 @@
         const day = date.getDay();
         const key = formatDateKey(date);
         return day !== 0 && day !== 6 && !feries[key];
+    }
+
+    // Nouvelle fonction pour ajouter/retirer des jours ouvrés à une date
+    function addWorkingDays(date, delta, feries) {
+        let d = new Date(date);
+        let count = 0;
+        const direction = delta > 0 ? 1 : -1;
+        const target = Math.abs(delta);
+        
+        while (count < target) {
+            d.setDate(d.getDate() + direction);
+            if (isWorkingDay(d, feries)) count++;
+        }
+        return d;
     }
 
     function selectTask(taskId, event) {
@@ -323,7 +341,14 @@
         event.stopPropagation();
         isResizing = true;
         const task = window.state.tasks.find(t => t.id === taskId);
-        resizeData = { taskId, direction, startX: event.pageX, originalStart: new Date(task.start), originalEnd: new Date(task.end) };
+        resizeData = { 
+            taskId, 
+            direction, 
+            startX: event.pageX, 
+            originalStart: new Date(task.start), 
+            originalEnd: new Date(task.end),
+            lastDelta: 0
+        };
         document.addEventListener('mousemove', handleResize);
         document.addEventListener('mouseup', endResize);
         document.body.style.cursor = 'ew-resize';
@@ -334,19 +359,44 @@
         if (!isResizing || !resizeData) return;
         const deltaX = event.pageX - resizeData.startX;
         const daysDelta = Math.round(deltaX / 50);
-        if (daysDelta === 0) return;
+        
+        if (daysDelta === resizeData.lastDelta) return;
+        resizeData.lastDelta = daysDelta;
+        
         const task = window.state.tasks.find(t => t.id === resizeData.taskId);
+        const y = resizeData.originalStart.getFullYear();
+        const feries = getFeries(y);
+        
         let newStart = new Date(resizeData.originalStart);
         let newEnd = new Date(resizeData.originalEnd);
-        if (resizeData.direction === 'left') { newStart.setDate(newStart.getDate() + daysDelta); if (newStart >= newEnd) return; }
-        else { newEnd.setDate(newEnd.getDate() + daysDelta); if (newEnd <= newStart) return; }
+        
+        if (resizeData.direction === 'left') {
+            // Déplacer le début
+            newStart = addWorkingDays(resizeData.originalStart, daysDelta, feries);
+            if (newStart >= newEnd) return;
+        } else {
+            // Déplacer la fin
+            newEnd = addWorkingDays(resizeData.originalEnd, daysDelta, feries);
+            if (newEnd <= newStart) return;
+        }
+        
         task.start = formatDateKey(newStart);
         task.end = formatDateKey(newEnd);
         task.duration = countBusinessDays(newStart, newEnd);
         render();
     }
 
-    function endResize() { if (isResizing) { isResizing = false; resizeData = null; document.removeEventListener('mousemove', handleResize); document.removeEventListener('mouseup', endResize); document.body.style.cursor = ''; document.body.style.userSelect = ''; saveState(); } }
+    function endResize() { 
+        if (isResizing) { 
+            isResizing = false; 
+            resizeData = null; 
+            document.removeEventListener('mousemove', handleResize); 
+            document.removeEventListener('mouseup', endResize); 
+            document.body.style.cursor = ''; 
+            document.body.style.userSelect = ''; 
+            saveState(); 
+        } 
+    }
 
     function addStaff() { 
         let n = document.getElementById('new_staff').value.trim(); 
@@ -372,8 +422,12 @@
     }
 
     function updateSelectors() {
-        document.getElementById('t_proj_sel').innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
-        document.getElementById('t_staff_sel').innerHTML = window.state.staff.map(s => `<option value="${s}">${s}</option>`).join('');
+        const projSel = document.getElementById('t_proj_sel');
+        projSel.innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} (${p.cli})</option>`).join('');
+        
+        const staffSel = document.getElementById('t_staff_sel');
+        staffSel.innerHTML = window.state.staff.map(s => `<option value="${s}">${s}</option>`).join('');
+        
         document.getElementById('print_proj_sel').innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} — ${p.cli}</option>`).join('');
         document.getElementById('staff-list').innerHTML = window.state.staff.map(s => `<div class="staff-item"><span>${s}</span><div class="staff-actions"><button class="btn-small btn-edit" onclick="renameStaff('${s}')">Modifier</button><button class="btn-small btn-delete" onclick="removeStaffFromList('${s}')">Retirer</button></div></div>`).join('');
     }
@@ -409,39 +463,55 @@
     }
 
     function newTask() {
+        updateSelectors();
         document.getElementById('modalT_title').innerText = "Nouvelle Tâche";
         document.getElementById('edit_task_id').value = "";
         document.getElementById('t_name').value = "";
         document.getElementById('t_start').value = formatDateKey(new Date());
         document.getElementById('t_dur').value = "1";
         document.getElementById('btn_del_task').style.display = "none";
-        updateSelectors(); showModal('modalT');
+        
+        // Sélectionner le premier projet par défaut
+        const projSel = document.getElementById('t_proj_sel');
+        if (projSel.options.length > 0) {
+            projSel.selectedIndex = 0;
+        }
+        
+        // Désélectionner tout le personnel
+        const staffSel = document.getElementById('t_staff_sel');
+        Array.from(staffSel.options).forEach(opt => opt.selected = false);
+        
+        showModal('modalT');
     }
 
     function editTask(id) {
         const t = window.state.tasks.find(x => x.id === id);
+        updateSelectors();
         document.getElementById('modalT_title').innerText = "Modifier Tâche";
         document.getElementById('edit_task_id').value = t.id;
         document.getElementById('t_name').value = t.name;
         document.getElementById('t_start').value = t.start;
         document.getElementById('t_dur').value = t.duration || 1;
         document.getElementById('btn_del_task').style.display = "block";
-        updateSelectors();
+        
         document.getElementById('t_proj_sel').value = t.pId;
         const sel = document.getElementById('t_staff_sel');
-        Array.from(sel.options).forEach(opt => opt.selected = t.staff.includes(opt.value));
+        Array.from(sel.options).forEach(opt => opt.selected = t.staff && t.staff.includes(opt.value));
         showModal('modalT');
     }
 
     function saveTask() {
         const id = document.getElementById('edit_task_id').value;
         const staff = Array.from(document.getElementById('t_staff_sel').selectedOptions).map(o => o.value);
-        if(!document.getElementById('t_start').value || staff.length === 0) return alert("Date et personnel requis");
+        if(!document.getElementById('t_start').value) return alert("Date de début requise");
+        if(staff.length === 0) return alert("Veuillez sélectionner au moins un membre du personnel");
+        
         const taskData = {
             id: id ? parseInt(id) : Date.now(),
             pId: parseInt(document.getElementById('t_proj_sel').value),
             name: document.getElementById('t_name').value || "Tâche",
-            staff, start: document.getElementById('t_start').value,
+            staff, 
+            start: document.getElementById('t_start').value,
             duration: parseInt(document.getElementById('t_dur').value),
             end: addBusinessDays(new Date(document.getElementById('t_start').value), parseInt(document.getElementById('t_dur').value))
         };
@@ -477,12 +547,17 @@
             window.state.tasks.filter(t => t.pId === p.id).forEach(t => {
                 html += `<tr><td class="col-fixed" style="padding-left:30px;"><span class="task-name" onclick="editTask(${t.id})">${t.name}</span></td>`;
                 let sD = new Date(t.start), eD = new Date(t.end);
+                
+                // Création des segments basés sur les jours ouvrés
                 let segments = [], currentSegment = null, current = new Date(sD);
                 while (current <= eD) {
                     if (isWorkingDay(current, feries)) {
                         if (!currentSegment) currentSegment = { start: new Date(current), end: new Date(current) };
                         else currentSegment.end = new Date(current);
-                    } else if (currentSegment) { segments.push(currentSegment); currentSegment = null; }
+                    } else if (currentSegment) { 
+                        segments.push(currentSegment); 
+                        currentSegment = null; 
+                    }
                     current.setDate(current.getDate() + 1);
                 }
                 if (currentSegment) segments.push(currentSegment);
@@ -501,11 +576,10 @@
             });
         });
         document.getElementById('gantt-table').innerHTML = html + `</tbody></table>`;
-        updateSelectors();
     }
 
     document.addEventListener('click', () => { if (!isResizing) { selectedTaskId = null; render(); } });
-    function showModal(id) { document.getElementById(id).style.display = 'flex'; updateSelectors(); }
+    function showModal(id) { document.getElementById(id).style.display = 'flex'; }
     function hideModal(id) { document.getElementById(id).style.display = 'none'; }
     function changeMonth(n) { viewDate.setMonth(viewDate.getMonth() + n); render(); }
 
