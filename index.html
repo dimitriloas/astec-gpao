@@ -115,6 +115,10 @@
         <button class="btn-blue" onclick="newTask()">+ Tâche</button>
         <button style="background: #9b59b6;" onclick="showModal('modalPerso')">👥 Personnel</button>
         <button class="btn-orange" onclick="showModal('modalPrint')">🖨️ Imprimer PDF</button>
+        <div style="display: flex; gap: 5px; align-items: center; margin-left: auto;">
+            <input type="text" id="search-affaire" placeholder="🔍 Rechercher N° Affaire" style="width: 200px;" onkeyup="searchProject(event)">
+            <button class="btn-grey" onclick="clearSearch()" id="clear-search-btn" style="display:none;">✕</button>
+        </div>
     </div>
 </div>
 
@@ -216,6 +220,7 @@
     let isResizing = false;
     let resizeData = null;
     let quickEditModal = null;
+    let searchFilter = null;
 
     function formatDateKey(date) {
         const d = new Date(date);
@@ -526,6 +531,36 @@
         if(confirm("Supprimer cette tâche ?")) { window.state.tasks = window.state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value)); saveState(); hideModal('modalT'); }
     }
 
+    function searchProject(event) {
+        const searchValue = document.getElementById('search-affaire').value.trim().toLowerCase();
+        if (searchValue === '') {
+            clearSearch();
+            return;
+        }
+        
+        // Rechercher le projet par N° d'affaire
+        const foundProjects = window.state.projects.filter(p => 
+            p.aff.toLowerCase().includes(searchValue)
+        );
+        
+        if (foundProjects.length > 0) {
+            searchFilter = foundProjects.map(p => p.id);
+            document.getElementById('clear-search-btn').style.display = 'block';
+            render();
+        } else {
+            searchFilter = [];
+            document.getElementById('clear-search-btn').style.display = 'block';
+            render();
+        }
+    }
+
+    function clearSearch() {
+        searchFilter = null;
+        document.getElementById('search-affaire').value = '';
+        document.getElementById('clear-search-btn').style.display = 'none';
+        render();
+    }
+
     function printPDF() {
         const projId = parseInt(document.getElementById('print_proj_sel').value);
         const startDateStr = document.getElementById('print_start_date').value;
@@ -662,7 +697,7 @@
         const monthEnd = new Date(y, m + 1, 0);
         
         // Filtrer uniquement les projets qui ont au moins une tâche dans le mois affiché
-        const projectsWithTasks = window.state.projects.filter(p => 
+        let projectsWithTasks = window.state.projects.filter(p => 
             window.state.tasks.some(t => {
                 if (t.pId !== p.id) return false;
                 const taskStart = new Date(t.start);
@@ -671,6 +706,21 @@
                 return taskStart <= monthEnd && taskEnd >= monthStart;
             })
         );
+        
+        // Appliquer le filtre de recherche si présent
+        if (searchFilter !== null) {
+            if (searchFilter.length === 0) {
+                // Aucun projet trouvé
+                projectsWithTasks = [];
+            } else {
+                projectsWithTasks = projectsWithTasks.filter(p => searchFilter.includes(p.id));
+            }
+        }
+        
+        // Message si aucun projet trouvé
+        if (searchFilter !== null && projectsWithTasks.length === 0) {
+            html += `<tr><td colspan="${daysInM + 1}" style="text-align:center; padding:40px; color:#7f8c8d; font-style:italic;">Aucun projet trouvé avec ce N° d'affaire</td></tr>`;
+        }
         
         projectsWithTasks.forEach(p => {
             html += `<tr class="row-p"><td class="col-fixed">
