@@ -543,9 +543,19 @@
 
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
         
-        // Filtrer uniquement les projets qui ont au moins une tâche
+        // Calculer les limites du mois affiché
+        const monthStart = new Date(y, m, 1);
+        const monthEnd = new Date(y, m + 1, 0);
+        
+        // Filtrer uniquement les projets qui ont au moins une tâche dans le mois affiché
         const projectsWithTasks = window.state.projects.filter(p => 
-            window.state.tasks.some(t => t.pId === p.id)
+            window.state.tasks.some(t => {
+                if (t.pId !== p.id) return false;
+                const taskStart = new Date(t.start);
+                const taskEnd = new Date(t.end);
+                // Vérifier si la tâche chevauche le mois affiché
+                return taskStart <= monthEnd && taskEnd >= monthStart;
+            })
         );
         
         projectsWithTasks.forEach(p => {
