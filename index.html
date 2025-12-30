@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>ASTEC GPAO - Gestion Projets & Jours Fériés</title>
     <style>
-        :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60; --weekend: #e8f5e9; --ferie: #fce4ec; }
+        :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --success: #27ae60; --weekend: #e8f5e9; --ferie: #fce4ec; --pont: #fff9c4; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 20px; background: #f4f7f6; }
 
         .header { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
@@ -27,6 +27,7 @@
         .sep-lundi { border-left: 3px solid #bdc3c7 !important; }
         .weekend { background: var(--weekend) !important; }
         .ferie { background: var(--ferie) !important; }
+        .pont { background: var(--pont) !important; }
 
         .ferie-header-name { font-size: 10px; color: #d81b60; font-weight: bold; line-height: 1; padding: 2px; }
 
@@ -113,7 +114,7 @@
         <button class="btn-blue" onclick="changeMonth(1)">Suivant ▶</button>
         <button class="btn-green" onclick="openModalP()">+ Projet</button>
         <button class="btn-blue" onclick="newTask()">+ Tâche</button>
-        <button style="background: #9b59b6;" onclick="showModal('modalPerso')">👥 Personnel</button>
+        <button style="background: #9b59b6;" onclick="showModal('modalPerso')">👥 Personnel / Ponts</button>
         <button class="btn-orange" onclick="showModal('modalPrint')">🖨️ Imprimer PDF</button>
         <div style="display: flex; gap: 5px; align-items: center; margin-left: auto;">
             <input type="text" id="search-affaire" placeholder="🔍 Rechercher N° Affaire" style="width: 200px;" onkeyup="searchProject(event)">
@@ -157,10 +158,19 @@
 
 <div id="modalPerso" class="modal"><div class="modal-content">
     <h3>Gestion Personnel</h3>
-    <div id="staff-list" style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; margin-bottom:10px;"></div>
-    <input type="text" id="new_staff" placeholder="Nom Prénom">
-    <button class="btn-green" onclick="addStaff()">Ajouter</button>
-    <button class="btn-grey" onclick="hideModal('modalPerso')">Fermer</button>
+    <div id="staff-list" style="max-height: 150px; overflow-y: auto; border: 1px solid #eee; margin-bottom:10px;"></div>
+    <div style="display:flex; gap:5px;">
+        <input type="text" id="new_staff" placeholder="Nom Prénom" style="flex:1">
+        <button class="btn-green" onclick="addStaff()">Ajouter</button>
+    </div>
+    <hr>
+    <h3>Gestion des Ponts</h3>
+    <div id="pont-list" style="max-height: 100px; overflow-y: auto; border: 1px solid #eee; margin-bottom:10px;"></div>
+    <div style="display:flex; gap:5px;">
+        <input type="date" id="new_pont_date" style="flex:1">
+        <button class="btn-orange" onclick="addPont()">Ajouter Pont</button>
+    </div>
+    <button class="btn-grey" style="margin-top:10px;" onclick="hideModal('modalPerso')">Fermer</button>
 </div></div>
 
 <div id="modalPrint" class="modal"><div class="modal-content">
@@ -179,7 +189,6 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    // CONFIGURATION FIREBASE
     const firebaseConfig = {
         apiKey: "AIzaSyAGziDYYX7R-3MV5UX3UO4xy8iwWdOkgI8",
         authDomain: "astec-gpao.firebaseapp.com",
@@ -201,6 +210,7 @@
             if (!window.state.projects) window.state.projects = [];
             if (!window.state.tasks) window.state.tasks = [];
             if (!window.state.staff) window.state.staff = [];
+            if (!window.state.ponts) window.state.ponts = [];
             render();
         }
     });
@@ -211,7 +221,7 @@
 </script>
 
 <script>
-    window.state = { projects: [], tasks: [], staff: [] };
+    window.state = { projects: [], tasks: [], staff: [], ponts: [] };
     let viewDate = new Date(); viewDate.setDate(1);
     let selectedTaskId = null;
     let isResizing = false;
@@ -233,18 +243,21 @@
         const lP = new Date(p); lP.setDate(p.getDate() + 1);
         const asc = new Date(p); asc.setDate(p.getDate() + 39);
         const lPent = new Date(p); lPent.setDate(p.getDate() + 50);
-        return {
+        let f = {
             [`${year}-01-01`]: "An", [`${year}-05-01`]: "Travail", [`${year}-05-08`]: "1945",
             [`${year}-07-14`]: "National", [`${year}-08-15`]: "Assompt.", [`${year}-11-01`]: "Toussaint",
             [`${year}-11-11`]: "Armist.", [`${year}-12-25`]: "Noël",
             [formatDateKey(lP)]: "Pâques", [formatDateKey(asc)]: "Ascens.", [formatDateKey(lPent)]: "Pentec."
         };
+        // Intégrer les ponts comme des jours fériés
+        if (window.state.ponts) {
+            window.state.ponts.forEach(date => { f[date] = "PONT"; });
+        }
+        return f;
     }
 
     function saveState() {
-        if (window.saveToFirebase) {
-            window.saveToFirebase();
-        }
+        if (window.saveToFirebase) window.saveToFirebase();
     }
 
     function getWeekNumber(d) {
@@ -253,11 +266,16 @@
         return Math.ceil((((d - new Date(Date.UTC(d.getUTCFullYear(), 0, 1))) / 86400000) + 1) / 7);
     }
 
+    function isWorkingDay(date, feries) {
+        const day = date.getDay();
+        const key = formatDateKey(date);
+        return day !== 0 && day !== 6 && !feries[key];
+    }
+
     function addBusinessDays(startDate, days) {
         let d = new Date(startDate);
-        const y = d.getFullYear();
-        const feries = getFeries(y);
         let c = 0;
+        const feries = getFeries(d.getFullYear());
         while (c < days) {
             if (isWorkingDay(d, feries)) c++;
             if (c < days) d.setDate(d.getDate() + 1);
@@ -267,19 +285,12 @@
 
     function countBusinessDays(start, end) {
         let count = 0, current = new Date(start), endDate = new Date(end);
-        const y = current.getFullYear();
-        const feries = getFeries(y);
+        const feries = getFeries(current.getFullYear());
         while (current <= endDate) {
             if (isWorkingDay(current, feries)) count++;
             current.setDate(current.getDate() + 1);
         }
         return count;
-    }
-
-    function isWorkingDay(date, feries) {
-        const day = date.getDay();
-        const key = formatDateKey(date);
-        return day !== 0 && day !== 6 && !feries[key];
     }
 
     function addWorkingDays(date, delta, feries) {
@@ -386,7 +397,6 @@
         } 
     }
 
-    // CORRECTION ICI : Ajout de la mise à jour visuelle après l'ajout
     function addStaff() { 
         let n = document.getElementById('new_staff').value.trim(); 
         if(n && !window.state.staff.includes(n)) { 
@@ -394,8 +404,28 @@
             window.state.staff.sort(); 
             saveState(); 
             document.getElementById('new_staff').value=''; 
-            updateSelectors(); // Met à jour les listes et l'affichage du personnel
+            updateSelectors(); 
         } 
+    }
+
+    function addPont() {
+        let d = document.getElementById('new_pont_date').value;
+        if(d && !window.state.ponts.includes(d)) {
+            window.state.ponts.push(d);
+            window.state.ponts.sort();
+            saveState();
+            updateSelectors();
+            render();
+        }
+    }
+
+    function removePont(d) {
+        if(confirm(`Supprimer le pont du ${d} ?`)) {
+            window.state.ponts = window.state.ponts.filter(p => p !== d);
+            saveState();
+            updateSelectors();
+            render();
+        }
     }
 
     function renameStaff(oldName) {
@@ -429,7 +459,10 @@
         if(printSel) printSel.innerHTML = window.state.projects.map(p => `<option value="${p.id}">${p.aff} — ${p.cli}</option>`).join('');
         
         const staffList = document.getElementById('staff-list');
-        if(staffList) staffList.innerHTML = window.state.staff.map(s => `<div class="staff-item"><span>${s}</span><div class="staff-actions"><button class="btn-small btn-edit" onclick="renameStaff('${s}')">Modifier</button><button class="btn-small btn-delete" onclick="removeStaffFromList('${s}')">Retirer</button></div></div>`).join('');
+        if(staffList) staffList.innerHTML = window.state.staff.map(s => `<div class="staff-item"><span>${s}</span><div class="staff-actions"><button class="btn-small btn-edit" onclick="renameStaff('${s}')">Modif.</button><button class="btn-small btn-delete" onclick="removeStaffFromList('${s}')">X</button></div></div>`).join('');
+
+        const pontList = document.getElementById('pont-list');
+        if(pontList) pontList.innerHTML = (window.state.ponts || []).map(p => `<div class="staff-item"><span>${new Date(p).toLocaleDateString()}</span><button class="btn-small btn-delete" onclick="removePont('${p}')">X</button></div>`).join('');
     }
 
     function openModalP(id = null) {
@@ -544,10 +577,11 @@
         for(let i=0; i<28; i++) {
             let dt = new Date(startDate); dt.setDate(dt.getDate() + i);
             let ds = formatDateKey(dt), isFerie = feries[ds], isWeekend = (dt.getDay()===0||dt.getDay()===6);
+            let isPont = (isFerie === "PONT");
             weekSpan++;
             if (dt.getDay() === 0 || i === 27) { rowWeeks += `<th colspan="${weekSpan}" style="background:#f8f9fa; font-size:0.75em; border-bottom: 2px solid var(--accent);">Sem. ${getWeekNumber(dt)}</th>`; weekSpan = 0; }
-            rowFerieNames += `<th class="col-day ${isFerie ? 'ferie' : ''}">${isFerie ? `<div class="ferie-header-name">${isFerie}</div>` : ''}</th>`;
-            rowDays += `<th class="col-day ${isWeekend ? 'weekend' : ''} ${isFerie ? 'ferie' : ''}"><div style="font-size:0.8em;">${dt.toLocaleDateString('fr-FR', {weekday:'short'}).replace('.','')}</div><div>${dt.getDate()}</div></th>`;
+            rowFerieNames += `<th class="col-day ${isPont ? 'pont' : (isFerie ? 'ferie' : '')}">${isFerie ? `<div class="ferie-header-name">${isFerie}</div>` : ''}</th>`;
+            rowDays += `<th class="col-day ${isWeekend ? 'weekend' : ''} ${isPont ? 'pont' : (isFerie ? 'ferie' : '')}"><div style="font-size:0.8em;">${dt.toLocaleDateString('fr-FR', {weekday:'short'}).replace('.','')}</div><div>${dt.getDate()}</div></th>`;
         }
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
         html += `<tr class="row-p"><td class="col-fixed"><b>${project.aff} — ${project.cli}</b><div style="font-size:0.85em; color:#7f8c8d; margin-top:2px;">${project.nature || ''}</div><div style="font-size:0.9em; color:#95a5a6; margin-top:3px;">${project.lie}</div></td><td colspan="28"></td></tr>`;
@@ -561,7 +595,10 @@
             }
             if (curSeg) segments.push(curSeg);
             for(let i=0; i<28; i++) {
-                let cur = new Date(startDate); cur.setDate(cur.getDate() + i); let content = "";
+                let cur = new Date(startDate); cur.setDate(cur.getDate() + i); 
+                let ds = formatDateKey(cur), isFerie = feries[ds], isWeekend = (cur.getDay()===0||cur.getDay()===6);
+                let isPont = (isFerie === "PONT");
+                let content = "";
                 segments.forEach((seg, idx) => {
                     if (cur.toDateString() === seg.start.toDateString()) {
                         let width = (Math.ceil((seg.end - seg.start) / 86400000) + 1) * 50;
@@ -569,7 +606,7 @@
                         content = `<div class="task-bar" style="background:${project.color}; width:${width-4}px;">${staffDisplay}</div>`;
                     }
                 });
-                html += `<td class="col-day ${cur.getDay()===0||cur.getDay()===6?'weekend':''}">${content}</td>`;
+                html += `<td class="col-day ${isWeekend ? 'weekend' : ''} ${isPont ? 'pont' : (isFerie ? 'ferie' : '')}">${content}</td>`;
             }
             html += `</tr>`;
         });
@@ -587,10 +624,11 @@
         let weekSpan = 0;
         for(let d=1; d<=daysInM; d++) {
             let dt = new Date(y, m, d), ds = formatDateKey(dt), isFerie = feries[ds], isWeekend = (dt.getDay()===0||dt.getDay()===6);
+            let isPont = (isFerie === "PONT");
             weekSpan++;
             if (dt.getDay() === 0 || d === daysInM) { rowWeeks += `<th colspan="${weekSpan}" style="background:#f8f9fa; font-size:0.75em; border-bottom: 2px solid var(--accent);">Sem. ${getWeekNumber(dt)}</th>`; weekSpan = 0; }
-            rowFerieNames += `<th class="col-day ${isFerie ? 'ferie' : ''}">${isFerie ? `<div class="ferie-header-name">${isFerie}</div>` : ''}</th>`;
-            rowDays += `<th class="col-day ${isWeekend ? 'weekend' : ''} ${isFerie ? 'ferie' : ''}"><div style="font-size:0.8em;">${dt.toLocaleDateString('fr-FR', {weekday:'short'}).replace('.','')}</div><div>${d}</div></th>`;
+            rowFerieNames += `<th class="col-day ${isPont ? 'pont' : (isFerie ? 'ferie' : '')}">${isFerie ? `<div class="ferie-header-name">${isFerie}</div>` : ''}</th>`;
+            rowDays += `<th class="col-day ${isWeekend ? 'weekend' : ''} ${isPont ? 'pont' : (isFerie ? 'ferie' : '')}"><div style="font-size:0.8em;">${dt.toLocaleDateString('fr-FR', {weekday:'short'}).replace('.','')}</div><div>${d}</div></th>`;
         }
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
         const mStart = new Date(y, m, 1), mEnd = new Date(y, m + 1, 0);
@@ -610,13 +648,15 @@
                 if (curSeg) segments.push(curSeg);
                 for(let d=1; d<=daysInM; d++) {
                     let cur = new Date(y, m, d), content = "";
+                    let ds = formatDateKey(cur), isFerie = feries[ds], isWeekend = (cur.getDay()===0||cur.getDay()===6);
+                    let isPont = (isFerie === "PONT");
                     segments.forEach((seg, idx) => {
                         if (cur.toDateString() === seg.start.toDateString()) {
                             let width = (Math.ceil((seg.end - seg.start) / 86400000) + 1) * 50;
                             content = `<div class="task-bar ${selectedTaskId===t.id?'selected':''}" style="background:${p.color}; width:${width-4}px;" onclick="selectTask(${t.id}, event)" ondblclick="onTaskDoubleClick(${t.id}, event)">${idx===0?`<div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', event)"></div>`:''}${idx===0?(t.staff||[]).map(s=>`<div class="staff-tag">${s}</div>`).join(''):''}${idx===segments.length-1?`<div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', event)"></div>`:''}</div>`;
                         }
                     });
-                    html += `<td class="col-day ${cur.getDay()===0||cur.getDay()===6?'weekend':''}">${content}</td>`;
+                    html += `<td class="col-day ${isWeekend ? 'weekend' : ''} ${isPont ? 'pont' : (isFerie ? 'ferie' : '')}">${content}</td>`;
                 }
                 html += `</tr>`;
             });
