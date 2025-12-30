@@ -710,7 +710,10 @@
     }
 
     document.addEventListener('click', () => { if (!isResizing) { selectedTaskId = null; render(); } });
-    function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function showModal(id) { 
+        updateSelectors(); 
+        document.getElementById(id).style.display = 'flex'; 
+    }
     function hideModal(id) { document.getElementById(id).style.display = 'none'; }
     function changeMonth(n) { viewDate.setMonth(viewDate.getMonth() + n); render(); }
 
