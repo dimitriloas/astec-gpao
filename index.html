@@ -131,7 +131,7 @@
         <button style="background: #9b59b6;" onclick="showModal('modalPerso')">👥 Personnel / Ponts</button>
         <button class="btn-orange" onclick="showModal('modalPrint')">🖨️ Imprimer PDF</button>
         <div style="display: flex; gap: 5px; align-items: center; margin-left: auto;">
-            <input type="text" id="search-affaire" placeholder="🔍 Rechercher N° Affaire" style="width: 200px;" onkeyup="searchProject(event)">
+            <input type="text" id="search-affaire" placeholder="🔍 Rechercher N° Affaire" style="width: 200px;" onkeydown="handleSearchKeydown(event)">
             <button class="btn-grey" onclick="clearSearch()" id="clear-search-btn" style="display:none;">✕</button>
         </div>
     </div>
@@ -318,6 +318,13 @@
         return d;
     }
 
+    function getInitials(fullName) {
+        if (!fullName) return '';
+        const words = fullName.trim().split(/\s+/);
+        if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+        return words.map(w => w.charAt(0).toUpperCase()).join('');
+    }
+
     function selectTask(taskId, event) {
         event.stopPropagation();
         closeQuickEditModal();
@@ -374,13 +381,6 @@
         document.addEventListener('mouseup', endResize);
         document.body.style.cursor = 'ew-resize';
         document.body.style.userSelect = 'none';
-    }
-
-    function getInitials(fullName) {
-        if (!fullName) return '';
-        const words = fullName.trim().split(/\s+/);
-        if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
-        return words.map(w => w.charAt(0).toUpperCase()).join('');
     }
 
     function handleResize(event) {
@@ -568,15 +568,37 @@
         if(confirm("Supprimer cette tâche ?")) { window.state.tasks = window.state.tasks.filter(x => x.id !== parseInt(document.getElementById('edit_task_id').value)); saveState(); hideModal('modalT'); }
     }
 
-    function searchProject(event) {
-        const searchValue = document.getElementById('search-affaire').value.trim().toLowerCase();
-        if (searchValue === '') { clearSearch(); return; }
-        const foundProjects = window.state.projects.filter(p => p.aff.toLowerCase().includes(searchValue));
-        if (foundProjects.length > 0) { searchFilter = foundProjects.map(p => p.id); document.getElementById('clear-search-btn').style.display = 'block'; render(); } 
-        else { searchFilter = []; document.getElementById('clear-search-btn').style.display = 'block'; render(); }
+    function handleSearchKeydown(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            searchProject();
+        }
     }
 
-    function clearSearch() { searchFilter = null; document.getElementById('search-affaire').value = ''; document.getElementById('clear-search-btn').style.display = 'none'; render(); }
+    function searchProject() {
+        const searchValue = document.getElementById('search-affaire').value.trim().toLowerCase();
+        if (searchValue === '') { 
+            clearSearch(); 
+            return; 
+        }
+        const foundProjects = window.state.projects.filter(p => p.aff.toLowerCase().includes(searchValue));
+        if (foundProjects.length > 0) { 
+            searchFilter = foundProjects.map(p => p.id); 
+            document.getElementById('clear-search-btn').style.display = 'block'; 
+            render(); 
+        } else { 
+            searchFilter = []; 
+            document.getElementById('clear-search-btn').style.display = 'block'; 
+            render(); 
+        }
+    }
+
+    function clearSearch() { 
+        searchFilter = null; 
+        document.getElementById('search-affaire').value = ''; 
+        document.getElementById('clear-search-btn').style.display = 'none'; 
+        render(); 
+    }
 
     function printPDF() {
         const projId = parseInt(document.getElementById('print_proj_sel').value);
@@ -661,7 +683,13 @@
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
         const mStart = new Date(y, m, 1), mEnd = new Date(y, m + 1, 0);
         let projs = window.state.projects.filter(p => window.state.tasks.some(t => t.pId === p.id && new Date(t.start) <= mEnd && new Date(t.end) >= mStart));
-        if (searchFilter !== null) projs = searchFilter.length === 0 ? [] : projs.filter(p => searchFilter.includes(p.id));
+        if (searchFilter !== null) {
+            if (searchFilter.length === 0) {
+                projs = [];
+            } else {
+                projs = projs.filter(p => searchFilter.includes(p.id));
+            }
+        }
         if (searchFilter !== null && projs.length === 0) html += `<tr><td colspan="${daysInM + 1}" style="text-align:center; padding:40px; color:#7f8c8d; font-style:italic;">Aucun projet trouvé avec ce N° d'affaire</td></tr>`;
         projs.forEach(p => {
             html += `<tr class="row-p"><td class="col-fixed"><div class="proj-header-line"><div class="proj-main-info"><span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} — ${p.cli}</b></span>${p.lie ? `<span class="proj-location"><span class="location-icon">📍</span>${p.lie}</span>` : ''}</div></div><div style="font-size:0.85em; color:#7f8c8d; margin-top:4px;">${p.nature || ''}</div></td><td colspan="${daysInM}"></td></tr>`;
