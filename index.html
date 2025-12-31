@@ -50,14 +50,15 @@
         .task-bar-cell { position: relative; padding: 0 !important; vertical-align: top; }
         .task-bar {
             position: absolute; top: 2px; left: 2px; z-index: 10; border-radius: 4px;
-            color: white; display: flex; flex-direction: column; gap: 2px; padding: 4px;
+            color: white; display: flex; flex-direction: row; flex-wrap: wrap; gap: 2px; padding: 4px;
             font-size: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            overflow: hidden; box-sizing: border-box;
+            overflow: visible; box-sizing: border-box;
             cursor: pointer;
             pointer-events: auto;
             transition: box-shadow 0.2s;
             height: 42px;
             min-height: 42px;
+            align-content: flex-start;
         }
 
         .task-bar:hover { box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
@@ -68,10 +69,9 @@
             padding: 1px 5px; 
             border-radius: 2px; 
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 100%;
+            overflow: visible;
             font-size: 9px;
+            display: inline-block;
         }
 
         .resize-handle {
@@ -376,6 +376,13 @@
         document.body.style.userSelect = 'none';
     }
 
+    function getInitials(fullName) {
+        if (!fullName) return '';
+        const words = fullName.trim().split(/\s+/);
+        if (words.length === 1) return words[0].substring(0, 2).toUpperCase();
+        return words.map(w => w.charAt(0).toUpperCase()).join('');
+    }
+
     function handleResize(event) {
         if (!isResizing || !resizeData) return;
         const deltaX = event.pageX - resizeData.startX;
@@ -389,10 +396,10 @@
         let newEnd = new Date(resizeData.originalEnd);
         if (resizeData.direction === 'left') {
             newStart = addWorkingDays(resizeData.originalStart, daysDelta, feries);
-            if (newStart >= newEnd) return;
+            if (newStart > newEnd) newStart = new Date(newEnd);
         } else {
             newEnd = addWorkingDays(resizeData.originalEnd, daysDelta, feries);
-            if (newEnd <= newStart) return;
+            if (newEnd < newStart) newEnd = new Date(newStart);
         }
         task.start = formatDateKey(newStart);
         task.end = formatDateKey(newEnd);
@@ -615,7 +622,15 @@
                 segments.forEach((seg, idx) => {
                     if (cur.toDateString() === seg.start.toDateString()) {
                         let width = (Math.ceil((seg.end - seg.start) / 86400000) + 1) * 50;
-                        let staffDisplay = (showStaff && idx === 0) ? (t.staff||[]).map(s=>`<div class="staff-tag">${s}</div>`).join('') : '';
+                        let segmentDays = Math.ceil((seg.end - seg.start) / 86400000) + 1;
+                        let staffDisplay = '';
+                        if (showStaff && idx === 0) {
+                            if (segmentDays === 1) {
+                                staffDisplay = (t.staff||[]).map(s=>`<div class="staff-tag">${getInitials(s)}</div>`).join('');
+                            } else {
+                                staffDisplay = (t.staff||[]).map(s=>`<div class="staff-tag">${s}</div>`).join('');
+                            }
+                        }
                         content = `<div class="task-bar" style="background:${project.color}; width:${width-4}px;">${staffDisplay}</div>`;
                     }
                 });
@@ -666,7 +681,16 @@
                     segments.forEach((seg, idx) => {
                         if (cur.toDateString() === seg.start.toDateString()) {
                             let width = (Math.ceil((seg.end - seg.start) / 86400000) + 1) * 50;
-                            content = `<div class="task-bar ${selectedTaskId===t.id?'selected':''}" style="background:${p.color}; width:${width-4}px;" onclick="selectTask(${t.id}, event)" ondblclick="onTaskDoubleClick(${t.id}, event)">${idx===0?`<div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', event)"></div>`:''}${idx===0?(t.staff||[]).map(s=>`<div class="staff-tag">${s}</div>`).join(''):''}${idx===segments.length-1?`<div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', event)"></div>`:''}</div>`;
+                            let segmentDays = Math.ceil((seg.end - seg.start) / 86400000) + 1;
+                            let staffDisplay = '';
+                            if (idx === 0) {
+                                if (segmentDays === 1) {
+                                    staffDisplay = (t.staff||[]).map(s=>`<div class="staff-tag">${getInitials(s)}</div>`).join('');
+                                } else {
+                                    staffDisplay = (t.staff||[]).map(s=>`<div class="staff-tag">${s}</div>`).join('');
+                                }
+                            }
+                            content = `<div class="task-bar ${selectedTaskId===t.id?'selected':''}" style="background:${p.color}; width:${width-4}px;" onclick="selectTask(${t.id}, event)" ondblclick="onTaskDoubleClick(${t.id}, event)">${idx===0?`<div class="resize-handle left" onmousedown="startResize(${t.id}, 'left', event)"></div>`:''}${staffDisplay}${idx===segments.length-1?`<div class="resize-handle right" onmousedown="startResize(${t.id}, 'right', event)"></div>`:''}</div>`;
                         }
                     });
                     html += `<td class="col-day ${isWeekend ? 'weekend' : ''} ${isPont ? 'pont' : (isFerie ? 'ferie' : '')}">${content}</td>`;
