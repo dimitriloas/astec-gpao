@@ -583,7 +583,18 @@
         }
         const foundProjects = window.state.projects.filter(p => p.aff.toLowerCase().includes(searchValue));
         if (foundProjects.length > 0) { 
-            searchFilter = foundProjects.map(p => p.id); 
+            searchFilter = foundProjects.map(p => p.id);
+            
+            // Trouver la première tâche du premier projet trouvé
+            const projectTasks = window.state.tasks.filter(t => t.pId === foundProjects[0].id);
+            if (projectTasks.length > 0) {
+                // Trier les tâches par date de début
+                projectTasks.sort((a, b) => new Date(a.start) - new Date(b.start));
+                const firstTaskDate = new Date(projectTasks[0].start);
+                // Changer le viewDate pour aller au mois de cette tâche
+                viewDate = new Date(firstTaskDate.getFullYear(), firstTaskDate.getMonth(), 1);
+            }
+            
             document.getElementById('clear-search-btn').style.display = 'block'; 
             render(); 
         } else { 
@@ -682,14 +693,18 @@
         }
         let html = `<table><thead>${rowWeeks}</tr>${rowFerieNames}</tr>${rowDays}</tr></thead><tbody>`;
         const mStart = new Date(y, m, 1), mEnd = new Date(y, m + 1, 0);
-        let projs = window.state.projects.filter(p => window.state.tasks.some(t => t.pId === p.id && new Date(t.start) <= mEnd && new Date(t.end) >= mStart));
+        let projs;
+        
         if (searchFilter !== null) {
             if (searchFilter.length === 0) {
                 projs = [];
             } else {
-                projs = projs.filter(p => searchFilter.includes(p.id));
+                projs = window.state.projects.filter(p => searchFilter.includes(p.id) && window.state.tasks.some(t => t.pId === p.id));
             }
+        } else {
+            projs = window.state.projects.filter(p => window.state.tasks.some(t => t.pId === p.id && new Date(t.start) <= mEnd && new Date(t.end) >= mStart));
         }
+        
         if (searchFilter !== null && projs.length === 0) html += `<tr><td colspan="${daysInM + 1}" style="text-align:center; padding:40px; color:#7f8c8d; font-style:italic;">Aucun projet trouvé avec ce N° d'affaire</td></tr>`;
         projs.forEach(p => {
             html += `<tr class="row-p"><td class="col-fixed"><div class="proj-header-line"><div class="proj-main-info"><span class="proj-name" onclick="openModalP(${p.id})"><b>${p.aff} — ${p.cli}</b></span>${p.lie ? `<span class="proj-location"><span class="location-icon">📍</span>${p.lie}</span>` : ''}</div></div><div style="font-size:0.85em; color:#7f8c8d; margin-top:4px;">${p.nature || ''}</div></td><td colspan="${daysInM}"></td></tr>`;
